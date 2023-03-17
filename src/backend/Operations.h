@@ -13,7 +13,6 @@ namespace rat_gemm {
 class rat_gemm::backend::Operations {
   private:
     libxsmm_meltwfunction_unary m_gather_rows = nullptr;
-
     libxsmm_gemmfunction m_sgemm = nullptr;
 
   public:
