@@ -12,7 +12,9 @@ namespace rat_gemm {
 
 class rat_gemm::backend::Operations {
   private:
-    libxsmm_meltwfunction_unary m_gather_rows;
+    libxsmm_meltwfunction_unary m_gather_rows = nullptr;
+
+    libxsmm_gemmfunction m_sgemm = nullptr;
 
   public:
     /**
@@ -38,6 +40,34 @@ class rat_gemm::backend::Operations {
     void apply_gather_rows( int64_t * i_row_ids,
                             float   * i_mat_0,
                             float   * i_mat_1 );
+
+    /**
+     * Initializes an SGEMM operation performan C=A*B.
+     *
+     * @param i_m BLAS parameter M.
+     * @param i_n BLAS parameter N.
+     * @param i_k BLAS parameter K.
+     * @param i_ld_a leading dimension of A.
+     * @param i_ld_b leading dimension of B.
+     * @param i_ld_c leading dimension of C.
+     **/
+    void init_sgemm( int64_t i_m,
+                     int64_t i_n,
+                     int64_t i_k,
+                     int64_t i_ld_a,
+                     int64_t i_ld_b,
+                     int64_t i_ld_c );
+
+    /**
+     * Applies the SGEMM operation C=A*B.
+     *
+     * @param i_a matrix A.
+     * @param i_b matrix B.
+     * @param o_c matrix C.
+     **/
+    void apply_sgemm( float * i_a,
+                      float * i_b,
+                      float * o_c );
 };
 
 #endif

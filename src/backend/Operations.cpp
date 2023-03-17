@@ -44,3 +44,45 @@ void rat_gemm::backend::Operations::apply_gather_rows( int64_t * i_row_ids,
   assert( m_gather_rows != NULL );
   m_gather_rows( &l_param );
 }
+
+void rat_gemm::backend::Operations::init_sgemm( int64_t i_m,
+                                                int64_t i_n,
+                                                int64_t i_k,
+                                                int64_t i_ld_a,
+                                                int64_t i_ld_b,
+                                                int64_t i_ld_c ) {
+  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+                   l_flags |= LIBXSMM_GEMM_FLAG_USE_XGEMM_ABI;
+                   l_flags |= LIBXSMM_GEMM_FLAG_BETA_0;
+  libxsmm_bitfield l_prefetch_flags = 0;
+
+  libxsmm_gemm_shape l_shape = libxsmm_create_gemm_shape( i_m,
+                                                          i_n,
+                                                          i_k,
+                                                          i_ld_a,
+                                                          i_ld_b,
+                                                          i_ld_c,
+                                                          LIBXSMM_DATATYPE_F32,
+                                                          LIBXSMM_DATATYPE_F32,
+                                                          LIBXSMM_DATATYPE_F32,
+                                                          LIBXSMM_DATATYPE_F32 );
+
+  m_sgemm = libxsmm_dispatch_gemm_v2( l_shape,
+                                      l_flags,
+                                      l_prefetch_flags );
+}
+
+void rat_gemm::backend::Operations::apply_sgemm( float * i_a,
+                                                 float * i_b,
+                                                 float       * o_c ) {
+  libxsmm_gemm_param l_param;
+  memset( &l_param,
+          0,
+          sizeof(libxsmm_gemm_param) );
+
+  l_param.a.primary = i_a;
+  l_param.b.primary = i_b;
+  l_param.c.primary = o_c;
+
+  m_sgemm( &l_param );
+}
