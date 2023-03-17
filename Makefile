@@ -3,9 +3,9 @@ CXXFLAGS ?=
 LDFLAGS ?=
 RPATHS ?=
 LIBXSMM_DIR ?= libxsmm
-OPTIONS = -O2 -std=c++20 -pedantic -Wall -Wextra -I.
+OPTIONS = -O2 -std=c++20 -pedantic -Wall -Wextra
 
-CXXFLAGS += -I${LIBXSMM_DIR}/include
+CXXFLAGS += -I. -I${LIBXSMM_DIR}/include
 LDFLAGS += ${LIBXSMM_DIR}/lib/libxsmm.a
 
 $(info $$CXXFLAGS is [${CXXFLAGS}])
