@@ -1,5 +1,6 @@
 #include <catch2/catch.hpp>
 #include "RatGemm.h"
+#include <iostream>
 
 /*
  * Rational test matrix consisting of 3x scaled and transposed stiffness matrices
@@ -153,6 +154,7 @@ TEST_CASE( "Rational GEMM which multiplies random DOFs with three stiffness matr
               3*20,                // ld_c
               l_stiff_single[0] ); // rat_a
 
+  // generate random dofs
   float l_dofs[9][35] = { 0 };
 
   for( int64_t l_qt = 0; l_qt < 9; l_qt++ ) {
@@ -160,19 +162,21 @@ TEST_CASE( "Rational GEMM which multiplies random DOFs with three stiffness matr
       l_dofs[l_qt][l_md] = (float) (rand()) / (float) (RAND_MAX);
     }
   }
-
+  
+  // l_result: matmul of 3 rational matrices with multiple DOFs after bf16.
   float l_result[9][3*20] = { 0 };
 
   l_rat.apply( l_dofs[0],
                l_result[0] );
 
+  // l_reference: real matmul of 3 rational matrices with multiple DOFs.
   float l_reference[3][9][35] = { 0 };
 
   for( int64_t l_di = 0; l_di < 3; l_di++ ) {
     for( int64_t l_m = 0; l_m < 35; l_m++ ) {
       for( int64_t l_n = 0; l_n < 9; l_n++ ) {
         for( int64_t l_k = 0; l_k < 35; l_k++ ) {
-          l_reference[l_di][l_n][l_m] += g_edge_stiffTLpc[l_di][l_k][l_m] * l_dofs[l_n][l_k];
+          l_reference[l_di][l_n][l_m] +=  g_edge_stiffTLpc[l_di][l_k][l_m] * l_dofs[l_n][l_k];
         }
       }
     }
