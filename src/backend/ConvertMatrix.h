@@ -1,27 +1,31 @@
-#ifndef RAT_GEMM_BACKEND_CONVERTER_H
-#define RAT_GEMM_BACKEND_CONVERTER_H
+#ifndef RAT_GEMM_BACKEND_CONVERT_MATRIX_H
+#define RAT_GEMM_BACKEND_CONVERT_MATRIX_H
 
-#include <arm_neon.h>
+// #include <arm_neon.h>
+#include <cstdint>
 
 namespace rat_gemm {
   namespace backend {
-    class Converter;
+    class ConvertMatrix;
   }
 }
 
-class rat_gemm::backend::Converter {
+class rat_gemm::backend::ConvertMatrix {
 public:
-    Converter() {}
+    ConvertMatrix() {}
 
     /**
      * Initializes an operation which gathers rows from A and stores them in B.
      *
      * @param i_value float value from stiff matrix A
-     * @param o_bf16_value BF16 version of value from stiff matrix A
+     * @param o_bf16_value_1 first part of converted BF16 value from stiff matrix A
+     * @param o_bf16_value_2 second part of the convereted Bf16 from stiff matrix A
      **/
-    // Convert single-precision float to bf16 using ARM NEON intrinsics
+    // Convert single-precision float to bf16
     void float_to_bfloat16( float i_value,
-                            uint32_t o_bf16_value );
+                            uint16_t& o_bf16_value_1,
+                            uint16_t& o_bf16_value_2 );
+
 /*
     // Convert bf16 to single-precision float using ARM NEON intrinsics
     static inline float bfloat16_to_float(uint32_t bf16_value) {
