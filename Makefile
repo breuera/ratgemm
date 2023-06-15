@@ -3,7 +3,9 @@ CXXFLAGS ?=
 LDFLAGS ?=
 RPATHS ?=
 LIBXSMM_DIR ?= libxsmm
-OPTIONS = -O2 -std=c++20 -pedantic -Wall -Wextra 
+OPTIONS = -O2 -std=c++20 -pedantic -Wall -Wextra -march=armv8-a+sve
+CC ?= clang
+CXX ?= clang++
 
 CXXFLAGS += -I. -I${LIBXSMM_DIR}/include
 LDFLAGS += ${LIBXSMM_DIR}/lib/libxsmm.a
