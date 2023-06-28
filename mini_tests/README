@@ -1,0 +1,1 @@
+g++ ./mini_tests/bf16_truncate.c -Ilibxsmm/include  -I/. -Ilibxsmm/lib -Llibxsmm/ libxsmm/lib/libxsmm.a
