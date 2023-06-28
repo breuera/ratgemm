@@ -1,9 +1,8 @@
 #ifndef RAT_GEMM_BACKEND_CONVERT_MATRIX_H
 #define RAT_GEMM_BACKEND_CONVERT_MATRIX_H
 
-#include <arm_bf16.h>
-#include <arm_neon.h>
-#include <cstdint>
+#include <iostream>
+#include <libxsmm.h>
 
 namespace rat_gemm {
   namespace backend {
@@ -24,11 +23,11 @@ public:
      **/
     // Convert single-precision float to bf16
     void float_to_bfloat16( float32_t i_value,
-                            bfloat16_t* o_bf16_value );
+                            uint16_t* o_bf16_value );
 
     void float_to_two_bfloat16( float value,
-                                bfloat16_t* o_bf16_value_1,
-                                bfloat16_t* o_bf16_value_2 );
+                                uint16_t* o_bf16_value_1,
+                                uint16_t* o_bf16_value_2 );
 
     // // Conversion function for l_stiff_single to bf16 matrices
     // static void convertToBFloat16( const float l_stiff_single[35][3*20],

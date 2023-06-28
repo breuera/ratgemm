@@ -15,7 +15,7 @@
 // }
 
 void rat_gemm::backend::ConvertMatrix::float_to_bfloat16( float32_t i_value,
-                                                          bfloat16_t* o_bf16_value ) {
+                                                          uint16_t* o_bf16_value ) {
   // Bit manipulation to extract sign, exponent, and mantissa of the input float
   float32_t l_float_bits = *reinterpret_cast<uint32_t*>(&i_value);
   float32_t l_sign_bit = l_float_bits >> 31;
@@ -36,8 +36,8 @@ void rat_gemm::backend::ConvertMatrix::float_to_bfloat16( float32_t i_value,
 }
 
 void rat_gemm::backend::ConvertMatrix::float_to_two_bfloat16( float i_value,
-                                                              bfloat16_t* o_bf16_value_1,
-                                                              bfloat16_t* o_bf16_value_2 ){
+                                                              uint16_t* o_bf16_value_1,
+                                                              uint16_t* o_bf16_value_2 ){
 
   uint32_t l_float_bits = *reinterpret_cast<uint32_t*>(&i_value);
   uint32_t l_sign_bit = l_float_bits >> 31 & 0x1;
