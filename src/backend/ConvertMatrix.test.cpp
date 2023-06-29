@@ -1,21 +1,41 @@
-#include <iostream>
 #include <catch2/catch.hpp>
+#include <cstdlib>
+#include <ctime>
 #include "ConvertMatrix.h"
 
+TEST_CASE("Test float_to_two_bfloat16") {
+    // Input values
+    int i_s = 3;
+    float* i_value = new float[i_s];
 
-  // Example float value
-  float value = 3.14159;
-TEST_CASE( "test the convert version from float to BF16" ) {
-  // Create an instance of the ConvertMatrix class
-  rat_gemm::backend::ConvertMatrix conv;
+    // Seed the random number generator
+    std::srand(std::time(0));
 
-  // Convert float to bf16
-  uint16_t bf16_value_1;
-  conv.float_to_bfloat16( value,
-                          bf16_value_1);
+    // Populate the input array with random numbers
+    for (int i = 0; i < i_s; ++i) {
+      i_value[i] = static_cast<float>(std::rand()) / RAND_MAX;
+    }
 
-  // Display the converted bf16 value
-  std::cout << "Original float value: " << value << std::endl;
-  std::cout << "Converted bf16 value: " << bf16_value_1 << std::endl;
-  REQUIRE( value == bf16_value_1 );
+    // Output arrays
+    libxsmm_bfloat16* o_bf16_value_1 = new libxsmm_bfloat16[i_s];
+    libxsmm_bfloat16* o_bf16_value_2 = new libxsmm_bfloat16[i_s];
+
+    // Call the function
+    rat_gemm::backend::ConvertMatrix conv;
+    conv.float_to_two_bfloat16(i_value, i_s, o_bf16_value_1, o_bf16_value_2);
+
+    // Verify the results
+    for (int i = 0; i < i_s; ++i) {
+      float tmp = static_cast<float>(o_bf16_value_1[i]);
+      float diff = i_value[i] - tmp;
+      float tmp2 = static_cast<float>(o_bf16_value_2[i]);
+
+      // Use the Approx matcher for "almost equal" comparison
+      REQUIRE(diff == Approx(tmp2));
+    }
+
+    // Clean up
+    delete[] i_value;
+    delete[] o_bf16_value_1;
+    delete[] o_bf16_value_2;
 }

@@ -3,7 +3,7 @@ CXXFLAGS ?=
 LDFLAGS ?=
 RPATHS ?=
 LIBXSMM_DIR ?= libxsmm
-OPTIONS = -O2 -std=c++20 -pedantic -Wall -Wextra 
+OPTIONS = -O2 -std=c++2a -pedantic -Wall -Wextra 
 CC ?= clang
 CXX ?= clang++
 

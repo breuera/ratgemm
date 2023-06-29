@@ -22,12 +22,14 @@ public:
      * @param o_bf16_value_2 second part of the convereted Bf16 from stiff matrix A
      **/
     // Convert single-precision float to bf16
-    void float_to_bfloat16( float32_t i_value,
-                            uint16_t* o_bf16_value );
-
-    void float_to_two_bfloat16( float value,
-                                uint16_t* o_bf16_value_1,
-                                uint16_t* o_bf16_value_2 );
+    // void float_to_bfloat16( float32_t i_value,
+    //                         uint16_t* o_bf16_value );
+  
+    // Convert single-precision float to two bf16
+    void float_to_two_bfloat16( float* i_value,
+                                int i_s,
+                                void* o_bf16_value_1,
+                                void* o_bf16_value_2 );
 
     // // Conversion function for l_stiff_single to bf16 matrices
     // static void convertToBFloat16( const float l_stiff_single[35][3*20],

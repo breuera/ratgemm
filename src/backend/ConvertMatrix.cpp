@@ -1,5 +1,4 @@
 #include "ConvertMatrix.h"
-#include <iostream>
 
 // Convert single-precision float to bf16 using ARM NEON intrinsics
 // void rat_gemm::backend::ConvertMatrix::float_to_bfloat16( float i_value,
@@ -14,56 +13,44 @@
 //   );
 // }
 
-void rat_gemm::backend::ConvertMatrix::float_to_bfloat16( float32_t i_value,
-                                                          uint16_t* o_bf16_value ) {
-  // Bit manipulation to extract sign, exponent, and mantissa of the input float
-  float32_t l_float_bits = *reinterpret_cast<uint32_t*>(&i_value);
-  float32_t l_sign_bit = l_float_bits >> 31;
-  float32_t l_exponent_bits = (l_float_bits >> 23) & 0xFF;
-  float32_t l_mantissa_bits = l_float_bits & 0x7FFFFF; // last 23 bits 0x7FFFFF
+// void rat_gemm::backend::ConvertMatrix::float_to_bfloat16( float32_t i_value,
+//                                                           uint16_t* o_bf16_value ) {
+//   // Bit manipulation to extract sign, exponent, and mantissa of the input float
+//   float32_t l_float_bits = *reinterpret_cast<uint32_t*>(&i_value);
+//   float32_t l_sign_bit = l_float_bits >> 31;
+//   float32_t l_exponent_bits = (l_float_bits >> 23) & 0xFF;
+//   float32_t l_mantissa_bits = l_float_bits & 0x7FFFFF; // last 23 bits 0x7FFFFF
 
-  // Calculate the bfloat16 representation
-  // uint16_t l_bf16_value = (l_sign_bit << 15) | (l_exponent_bits - 127 + 15) << 10 | (l_mantissa_bits >> 16);
-  bfloat16_t l_bf16_value = ((l_sign_bit << 15) | (l_exponent_bits << 7 ) | (l_mantissa_bits >> 16));
-  // if (((l_sign_bit << 15) | (l_exponent_bits - 127 + 15) << 10 | (l_mantissa_bits >> 16)) == ((l_sign_bit << 15) | (l_exponent_bits << 7 ) | (l_mantissa_bits >> 16))){
-  //     std::cout << "EQUAL" << std::endl;}
-  // std::cout << (l_sign_bit) << std::endl;
-  // std::cout << (l_exponent_bits) << std::endl;
-  // std::cout << (l_mantissa_bits) << std::endl;
+//   // Calculate the bfloat16 representation
+//   // uint16_t l_bf16_value = (l_sign_bit << 15) | (l_exponent_bits - 127 + 15) << 10 | (l_mantissa_bits >> 16);
+//   bfloat16_t l_bf16_value = ((l_sign_bit << 15) | (l_exponent_bits << 7 ) | (l_mantissa_bits >> 16));
+//   // if (((l_sign_bit << 15) | (l_exponent_bits - 127 + 15) << 10 | (l_mantissa_bits >> 16)) == ((l_sign_bit << 15) | (l_exponent_bits << 7 ) | (l_mantissa_bits >> 16))){
+//   //     std::cout << "EQUAL" << std::endl;}
+//   // std::cout << (l_sign_bit) << std::endl;
+//   // std::cout << (l_exponent_bits) << std::endl;
+//   // std::cout << (l_mantissa_bits) << std::endl;
 
-  // Store the bfloat16 value in the output parameter
-  o_bf16_value = l_bf16_value;
-}
+//   // Store the bfloat16 value in the output parameter
+//   o_bf16_value = l_bf16_value;
+// }
 
-void rat_gemm::backend::ConvertMatrix::float_to_two_bfloat16( float i_value,
-                                                              uint16_t* o_bf16_value_1,
-                                                              uint16_t* o_bf16_value_2 ){
+void rat_gemm::backend::ConvertMatrix::float_to_two_bfloat16( float* i_value,
+                                                              int i_s,
+                                                              libxsmm_bfloat16* o_bf16_value_1,
+                                                              libxsmm_bfloat16* o_bf16_value_2 ){
+  float* tmp = (float*)malloc(i_s * sizeof(float));
 
-  uint32_t l_float_bits = *reinterpret_cast<uint32_t*>(&i_value);
-  uint32_t l_sign_bit = l_float_bits >> 31 & 0x1;
-  uint16_t l_exponent_bits = (l_float_bits >> 23) & 0xFF;
-  int32_t l_mantissa_bits = l_float_bits & 0x7FFFFF; // last 23 bits 0x7FFFFF
 
-  // Apply rounding on mantissa if necessary
-  l_mantissa_bits = (l_mantissa_bits + 0x7FFF + ((l_mantissa_bits >> 16) & 1)) >> 16;
+  libxsmm_truncate_convert_f32_bf16((const float*)i_value, (libxsmm_bfloat16*)o_bf16_value_1, i_s);
+  libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)o_bf16_value_1, (float*)tmp, i_s);
 
-  // Truncate the mantissa to 7 bits
-  l_mantissa_bits &= 0x7F;
-
-  // Adjust exponent bias
-  int32_t l_adjusted_exponent = static_cast<int32_t>(l_exponent_bits) - 127 + 15;
-
-  // Handle overflow and underflow
-  if (l_adjusted_exponent < 0) {
-      o_bf16_value_1 = static_cast<uint16_t>(l_sign_bit << 15);  // Set to positive or negative zero
-      o_bf16_value_2 = 0;
-  } else if (l_adjusted_exponent > 31) {
-      o_bf16_value_1 = static_cast<uint16_t>((l_sign_bit << 15) | 0x7C00);  // Set to positive or negative infinity
-      o_bf16_value_2 = 0;
-  } else {
-      o_bf16_value_1 = static_cast<uint16_t>((l_sign_bit << 15) | (l_adjusted_exponent << 10) | l_mantissa_bits);
-      o_bf16_value_2 = static_cast<uint16_t>(l_float_bits >> 16);  // Shift the original value for the second BF16
+  for (unsigned int i = 0; i < i_s; ++i) {
+    *(tmp + i) = *(i_value + i) - *(tmp + i);
   }
+
+  libxsmm_truncate_convert_f32_bf16((const float*)tmp, (libxsmm_bfloat16*)o_bf16_value_2, i_s);
+
+  free(tmp);
 }
 
 
