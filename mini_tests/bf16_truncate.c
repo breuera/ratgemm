@@ -1,65 +1,48 @@
-#include <iostream>
-#include <iomanip>
 #include <libxsmm.h>
-#include <cmath>
-
-
-void print(const float* input, const float* output, unsigned int length){
-  std::cout << "Original Values\t Truncated Values" << std::endl;
-  std::cout << "--------------------------------" << std::endl;
-  for (unsigned int i = 0; i < length; ++i) {
-    // output[i] = input[i];
-    std::cout << std::fixed << std::setprecision(10);
-    std::cout << input[i] << "\t\t ";
-    std::cout << output[i] << std::endl;
-  }
-}
+#include "headers.hpp"
+#include <chrono>
 
 int main() {
-  const unsigned int length = 5;
-  float input[length] = {1.23f, -0.45f, 2.56f, -3.67f,4.78f};
-  float second_half_input[length];
+  int rows = 1;
+  int columns = 10;
+  int length = rows * columns;
+  
+  float** input = generateRandomMatrix(rows, columns);
+  float second_half_input[rows][columns];
 
-  libxsmm_bfloat16 first_half_bf16[length];
-  libxsmm_bfloat16 second_half_bf16[length];
+  float output[rows][columns];
 
-  float first_half_fp32[length];
-  float second_half_fp32[length];
+  libxsmm_bfloat16 first_half_bf16[rows][columns];
+  libxsmm_bfloat16 second_half_bf16[rows][columns];
+
+  float first_half_fp32[rows][columns];
+  float second_half_fp32[rows][columns];
+
+  // Measure the start time
+  auto start = std::chrono::high_resolution_clock::now();
   
   libxsmm_truncate_convert_f32_bf16((const float*)input, (libxsmm_bfloat16*)first_half_bf16, length);
-
-  libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)first_half_bf16, first_half_fp32, length);
+  libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)first_half_bf16, (float*)first_half_fp32, length);
 
   // Print the original bfloat16 values and truncated bfloat16 values
-  print(input, first_half_fp32, length);
+  // print((float*)input, (float*)first_half_fp32, length);
   
-  for (unsigned int i = 0; i < length; ++i) {
-    *(second_half_input + i) = *(input + i) - *(first_half_fp32 + i);
-  }
+  subtractMatrices((float*)input, (float*)first_half_fp32, (float*)second_half_input, rows , columns);
   
   libxsmm_rne_convert_fp32_bf16((const float*)second_half_input, (libxsmm_bfloat16*)second_half_bf16, length);
-  libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)second_half_bf16, second_half_fp32, length);
+  libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)second_half_bf16, (float*)second_half_fp32, length);
 
-  print(second_half_input, second_half_fp32, length);
-  
-  // uint8_t test[length];
+  // Measure the end time
+  auto end = std::chrono::high_resolution_clock::now();
 
-  for (unsigned int i = 0; i < length; ++i) {
-    std::cout << "-----------------------------------------" << std::endl;
-    std::cout << "Main fp32:             " << std::defaultfloat << std::setprecision(10) << input[i] << std::endl;
-    std::cout << "Converted fp32 2steps: " << std::defaultfloat << std::setprecision(10) << first_half_fp32[i] + second_half_fp32[i] << std::endl;
-    std::cout << "Loss:                  " << std::scientific << std::setprecision(2) << std::fabs(input[i] - (first_half_fp32[i] + second_half_fp32[i])) << std::endl;
-    std::cout << std::defaultfloat;
-    
-    // test[i] = (uint8_t) first_half_fp32[i];
-    // std::cout << "-----------------------------------------" << std::endl;
-    // std::cout << (float)(test[i]*2) << std::endl;
-    // std::cout << (float)(first_half_fp32[i]*2) << std::endl;
-    
-    // libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)(first_half_bf16 + second_half_bf16), second_half_input, length);
-    // std::cout << "converted fp32 once now" << second_half_input[i] << std::endl;
-  }
+  // Calculate the elapsed time
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
+  addMatrices((const float*) first_half_fp32, (const float*) second_half_fp32, (float*)output, rows, columns);
+  print((float*)input, (float*)output,  rows , columns);
+
+  // Print the elapsed time in microseconds
+  std::cout << "Elapsed time: " << duration.count() << " microseconds" << std::endl;
   
   return 0;
 }
