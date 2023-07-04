@@ -25,6 +25,11 @@ int main() {
   //     std::cout << "Input: " << input[i * columns + j] << std::endl;
   //   }
   // }
+
+  std::cout << "input: " << input[0] << std::endl; // 1 10000001 00100000 01010011 0110011
+                                       // Output   // 1 10000001 00100000 01010011 1000111
+
+
   float* output = new float[rows * columns];
   float* second_half_input = new float[rows * columns];
 
@@ -41,13 +46,21 @@ int main() {
   libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)first_half_bf16, (float*)first_half_fp32, length);
   // upconvert_bf16(rows , columns,(libxsmm_bfloat16*)first_half_bf16, (float*)first_half_fp32); // x3 slower
   // print(input, first_half_fp32, rows , columns);
-  // printBF16((libxsmm_bfloat16*)(first_half_bf16), rows,  columns);
+  std::cout << "first_half_bf16: " << *first_half_bf16[0] << std::endl; // 1 10000001 0010000
+  std::cout << "first_half_fp32: " << first_half_fp32[0] << std::endl;  // 1 10000001 0010000 0000000000000000
+
+  
 
   // Print the original bfloat16 values and truncated bfloat16 values  
   subtractMatrices((float*)input, (float*)first_half_fp32, (float*)second_half_input, rows , columns);
+  std::cout << "second_half_input: " << second_half_input[0] << std::endl; // 1 01110111 0100110 1011110000000001
   
   libxsmm_rne_convert_fp32_bf16((const float*)second_half_input, (libxsmm_bfloat16*)second_half_bf16, length);
   libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)second_half_bf16, (float*)second_half_fp32, length);
+
+  std::cout << "second_half_bf16: " << *second_half_bf16[0] << std::endl; // 1 01110111 0100111 + rounding nearest even
+  std::cout << "second_half_fp32: " << second_half_fp32[0] << std::endl;  // 1 01110111 0100111 0000000000001010
+
   // upconvert_bf16(rows , columns,(libxsmm_bfloat16*)second_half_bf16, (float*)second_half_fp32); // x3 slower
 
   // Measure the end time
@@ -57,11 +70,12 @@ int main() {
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
   addMatrices((const float*) first_half_fp32, (const float*) second_half_fp32, (float*)output, rows, columns);
-  print(input, output, rows , columns);
+  // print(input, output, rows , columns);
+  std::cout << "output: " << output[0] << std::endl; // 1 10000001 00100000010100111000111
+
 
   // Print the elapsed time in microseconds
   std::cout << "Elapsed time: " << duration.count() << " microseconds" << std::endl;
-
 
   delete[] input;
   delete[] output;
