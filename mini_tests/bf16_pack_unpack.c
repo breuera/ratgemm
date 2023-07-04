@@ -26,13 +26,12 @@ void reference_pack(libxsmm_blasint i_rows, libxsmm_blasint i_columns, float *ou
   }
 }
 
-
 int main() {
   int rows = 10;
-  int columns = 2000;
+  int columns = 1000;
   
   float* input = generateRandomMatrix(rows, columns);
-  float* output = generateRandomMatrix(rows, columns);
+  float* output = new float[rows * columns];
 
   libxsmm_bfloat16 first_half_bf16[rows][columns];
   libxsmm_bfloat16 second_half_bf16[rows][columns];
@@ -41,6 +40,7 @@ int main() {
   auto start = std::chrono::high_resolution_clock::now();
   // Convert one fp32 to two bf16
   reference_unpack(rows, columns, (float*)input, (libxsmm_bfloat16*)first_half_bf16, (libxsmm_bfloat16*)second_half_bf16);
+
   // Measure the end time
   auto end = std::chrono::high_resolution_clock::now();
 
