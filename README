@@ -1,4 +1,4 @@
-git clone git@github.com:libxsmm/libxsmm.git
+git clone https://github.com/libxsmm/libxsmm.git
 cd libxsmm
 make BLAS=0 -j
 

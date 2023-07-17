@@ -33,7 +33,7 @@ float* generateRandomMatrix(int i_rows, int i_columns) {
   float* o_matrix = new float[i_rows * i_columns];
   srand(5);
 
-  float l_minValue = -10.0;
+  float l_minValue = 0;
   float l_maxValue = 10.0;
 
   for (int i = 0; i < i_rows; i++) {
