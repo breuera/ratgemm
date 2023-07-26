@@ -1,65 +1,47 @@
 #include "ConvertMatrix.h"
 
-// Convert single-precision float to bf16 using ARM NEON intrinsics
-// void rat_gemm::backend::ConvertMatrix::float_to_bfloat16( float i_value,
-//                                                       uint32_t o_bf16_value ) {
-//   __asm__ __volatile__( // embed assembly code within C/C++ code without any reordering or optimization by the compiler
-//     "fcvtnt %w[out], %s[in]\n\t" // Convert float to bf16 using the fcvtnt instruction
-//     "sbfiz %w[out], %w[out], #16, #16\n\t" // Bitfield insert to truncate the result to 16 bits
-//     // Output constraint: "=r" means the output goes to a general-purpose register
-//     // Input constraint: "w" means the input comes from a general-purpose register
-//     : [out] "=r"(o_bf16_value) 
-//     : [in] "w"(i_value) 
-//   );
-// }
+void rat_gemm::backend::ConvertMatrix::generateRandomMatrix(float * io_matrix, int i_s) {
+  int seed = 12;
+  srand(seed);
 
-// void rat_gemm::backend::ConvertMatrix::float_to_bfloat16( float32_t i_value,
-//                                                           uint16_t* o_bf16_value ) {
-//   // Bit manipulation to extract sign, exponent, and mantissa of the input float
-//   float32_t l_float_bits = *reinterpret_cast<uint32_t*>(&i_value);
-//   float32_t l_sign_bit = l_float_bits >> 31;
-//   float32_t l_exponent_bits = (l_float_bits >> 23) & 0xFF;
-//   float32_t l_mantissa_bits = l_float_bits & 0x7FFFFF; // last 23 bits 0x7FFFFF
-
-//   // Calculate the bfloat16 representation
-//   // uint16_t l_bf16_value = (l_sign_bit << 15) | (l_exponent_bits - 127 + 15) << 10 | (l_mantissa_bits >> 16);
-//   bfloat16_t l_bf16_value = ((l_sign_bit << 15) | (l_exponent_bits << 7 ) | (l_mantissa_bits >> 16));
-//   // if (((l_sign_bit << 15) | (l_exponent_bits - 127 + 15) << 10 | (l_mantissa_bits >> 16)) == ((l_sign_bit << 15) | (l_exponent_bits << 7 ) | (l_mantissa_bits >> 16))){
-//   //     std::cout << "EQUAL" << std::endl;}
-//   // std::cout << (l_sign_bit) << std::endl;
-//   // std::cout << (l_exponent_bits) << std::endl;
-//   // std::cout << (l_mantissa_bits) << std::endl;
-
-//   // Store the bfloat16 value in the output parameter
-//   o_bf16_value = l_bf16_value;
-// }
-
-void rat_gemm::backend::ConvertMatrix::float_to_two_bfloat16( float* i_value,
-                                                              int i_s,
-                                                              libxsmm_bfloat16* o_bf16_value_1,
-                                                              libxsmm_bfloat16* o_bf16_value_2 ){
-  float* tmp = (float*)malloc(i_s * sizeof(float));
-
-
-  libxsmm_truncate_convert_f32_bf16((const float*)i_value, (libxsmm_bfloat16*)o_bf16_value_1, i_s);
-  libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)o_bf16_value_1, (float*)tmp, i_s);
-
-  for (unsigned int i = 0; i < i_s; ++i) {
-    *(tmp + i) = *(i_value + i) - *(tmp + i);
+  float l_minValue = -10.0;
+  float l_maxValue = 10.0;
+  float l_randomValue; 
+  for (int i = 0; i < i_s; i++) {
+      l_randomValue = l_minValue + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (l_maxValue - l_minValue)));
+      io_matrix[i] = l_randomValue;
   }
-
-  libxsmm_truncate_convert_f32_bf16((const float*)tmp, (libxsmm_bfloat16*)o_bf16_value_2, i_s);
-
-  free(tmp);
 }
 
+void rat_gemm::backend::ConvertMatrix::diff(float *i_matrix, const float *i_matrix_h1, const float *i_matrix_h2, float* o_diff, int i_s) {
+  for (int i = 0; i < i_s; ++i) {
+    libxsmm_float_uint hybrid_in_1 = {0};
+    libxsmm_float_uint hybrid_in_2 = {0};
+    libxsmm_float_uint hybrid_in = {0};
 
-// static void convertToBFloat16(const float l_stiff_single[35][3*20], uint32_t l_stiff_bf16[35][3*20]) {
-//   for (int64_t l_n = 0; l_n < 35; l_n++) {
-//     for (int64_t l_m = 0; l_m < 3*20; l_m++) {
-//       float value = l_stiff_single[l_n][l_m];
-//       uint32_t bf16_value = float_to_bfloat16(value);
-//       l_stiff_bf16[l_n][l_m] = bf16_value;
-//     }
-//   }
-// }
+    hybrid_in_1.f = i_matrix_h1[i];
+    hybrid_in_2.f = i_matrix_h2[i];
+    hybrid_in.f = i_matrix[i];
+    o_diff[i] = hybrid_in.f - (hybrid_in_1.f + hybrid_in_2.f);
+  }
+}
+
+void rat_gemm::backend::ConvertMatrix::convert_fp32_two_bf16(const float* i_matrix,
+                                                             libxsmm_bfloat16* o_matrix_bf16_h1,
+                                                             libxsmm_bfloat16* o_matrix_bf16_h2,
+                                                             int i_s){
+  float* l_first_half_fp32 = new float[i_s];
+  float* l_second_half_input = new float[i_s];
+
+  libxsmm_truncate_convert_f32_bf16((const float*)i_matrix, (libxsmm_bfloat16*)o_matrix_bf16_h1, i_s);
+  libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)o_matrix_bf16_h1, (float*)l_first_half_fp32, i_s);
+
+  for (int i = 0; i < i_s; i++) {
+      l_second_half_input[i] = i_matrix[i] - l_first_half_fp32[i];
+  }
+
+  libxsmm_rne_convert_fp32_bf16((const float*)l_second_half_input, (libxsmm_bfloat16*)o_matrix_bf16_h2, i_s);
+
+  delete[] l_first_half_fp32;
+  delete[] l_second_half_input;
+}

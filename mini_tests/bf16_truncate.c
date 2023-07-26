@@ -16,7 +16,7 @@ void upconvert_bf16(libxsmm_blasint i_rows, libxsmm_blasint i_columns, libxsmm_b
 
 int main() {
   int rows = 10;
-  int columns = 1000;
+  int columns = 10;
   int length = rows * columns;
   
   float* input = generateRandomMatrix(rows, columns);

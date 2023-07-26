@@ -1,7 +1,10 @@
 #ifndef RAT_GEMM_BACKEND_CONVERT_MATRIX_H
 #define RAT_GEMM_BACKEND_CONVERT_MATRIX_H
 
+#include <cstdlib>
+#include <cstdio>
 #include <iostream>
+
 #include <libxsmm.h>
 
 namespace rat_gemm {
@@ -11,30 +14,44 @@ namespace rat_gemm {
 }
 
 class rat_gemm::backend::ConvertMatrix {
-public:
+  public:
     ConvertMatrix() {}
+    /**
+     * Subtracts two matrices A and stores them in B.
+     *
+     * @param io_matrix matrix A which contains random values for test.
+     * @param i_s length of all matrices
+     **/
+    void rat_gemm::backend::ConvertMatrix::generateRandomMatrix(float * io_matrix,
+                                                                int i_s);
 
     /**
-     * Initializes an operation which gathers rows from A and stores them in B.
+     * Subtracts two matrices A and stores them in B.
      *
-     * @param i_value float value from stiff matrix A
-     * @param o_bf16_value_1 first part of converted BF16 value from stiff matrix A
-     * @param o_bf16_value_2 second part of the convereted Bf16 from stiff matrix A
+     * @param i_matrix matrix A which contains the original value.
+     * @param i_matrix_h1 matrix contains the first half in BF16.
+     * @param i_matrix_h2 matrix contains the second half in BF16.
+     * @param o_diff matrix contains the second half in BF16.
+     * @param i_s length of all matrices
      **/
-    // Convert single-precision float to bf16
-    // void float_to_bfloat16( float32_t i_value,
-    //                         uint16_t* o_bf16_value );
+    void rat_gemm::backend::ConvertMatrix::diff(float *i_matrix,
+                                                const float *i_matrix_h1,
+                                                const float *i_matrix_h2,
+                                                float* o_diff,
+                                                int i_s);
   
-    // Convert single-precision float to two bf16
-    void float_to_two_bfloat16( float* i_value,
-                                int i_s,
-                                void* o_bf16_value_1,
-                                void* o_bf16_value_2 );
-
-    // // Conversion function for l_stiff_single to bf16 matrices
-    // static void convertToBFloat16( const float l_stiff_single[35][3*20],
-                                    //   uint32_t l_stiff_bf16[35][3*20] );
-    
+    /**
+     * Subtracts two matrices A and stores them in B.
+     *
+     * @param i_matrix matrix A which contains the original value.
+     * @param o_matrix_bf16_h1 matrix contains the first half in BF16.
+     * @param o_matrix_bf16_h2 matrix contains the second half in BF16.
+     * @param i_s length of all matrices
+     **/
+    void convert_fp32_two_bf16(const float* i_matrix,
+                               libxsmm_bfloat16* o_matrix_bf16_h1,
+                               libxsmm_bfloat16* o_matrix_bf16_h2,
+                               int i_s);
 };
 
 #endif
