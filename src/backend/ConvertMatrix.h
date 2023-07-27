@@ -17,7 +17,7 @@ class rat_gemm::backend::ConvertMatrix {
   public:
     ConvertMatrix() {}
     /**
-     * Subtracts two matrices A and stores them in B.
+     * Generates random values for test.
      *
      * @param io_matrix matrix A which contains random values for test.
      * @param i_s length of all matrices
@@ -26,12 +26,12 @@ class rat_gemm::backend::ConvertMatrix {
                                                                 int i_s);
 
     /**
-     * Subtracts two matrices A and stores them in B.
+     * Calculates the error of conversion.
      *
      * @param i_matrix matrix A which contains the original value.
      * @param i_matrix_h1 matrix contains the first half in BF16.
      * @param i_matrix_h2 matrix contains the second half in BF16.
-     * @param o_diff matrix contains the second half in BF16.
+     * @param o_diff B matrix contains the second half in BF16.
      * @param i_s length of all matrices
      **/
     void rat_gemm::backend::ConvertMatrix::diff(float *i_matrix,
@@ -41,7 +41,7 @@ class rat_gemm::backend::ConvertMatrix {
                                                 int i_s);
   
     /**
-     * Subtracts two matrices A and stores them in B.
+     * converts matrix A to two bfloat16 matrices.
      *
      * @param i_matrix matrix A which contains the original value.
      * @param o_matrix_bf16_h1 matrix contains the first half in BF16.
