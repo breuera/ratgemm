@@ -17,10 +17,10 @@ TEST_CASE("Test convert_fp32_two_bf16") {
     libxsmm_bfloat16* o_matrix_bf16_h1 = new libxsmm_bfloat16[i_s];
     libxsmm_bfloat16* o_matrix_bf16_h2 = new libxsmm_bfloat16[i_s];
 
+    conv.convert_fp32_two_bf16(i_value, o_matrix_bf16_h1, o_matrix_bf16_h2, i_s);
+  
     float* l_fp32_h1 = new float[i_s];
     float* l_fp32_h2 = new float[i_s];
-
-    conv.convert_fp32_two_bf16(i_value, o_matrix_bf16_h1, o_matrix_bf16_h2, i_s);
 
     libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)o_matrix_bf16_h1, (float*)l_fp32_h1, i_s);
     libxsmm_convert_bf16_f32((const libxsmm_bfloat16*)o_matrix_bf16_h2, (float*)l_fp32_h2, i_s);

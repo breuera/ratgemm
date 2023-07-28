@@ -22,8 +22,8 @@ class rat_gemm::backend::ConvertMatrix {
      * @param io_matrix matrix A which contains random values for test.
      * @param i_s length of all matrices
      **/
-    void rat_gemm::backend::ConvertMatrix::generateRandomMatrix(float * io_matrix,
-                                                                int i_s);
+    void generateRandomMatrix(float * io_matrix,
+                              int i_s);
 
     /**
      * Calculates the error of conversion.
@@ -34,14 +34,23 @@ class rat_gemm::backend::ConvertMatrix {
      * @param o_diff B matrix contains the second half in BF16.
      * @param i_s length of all matrices
      **/
-    void rat_gemm::backend::ConvertMatrix::diff(float *i_matrix,
-                                                const float *i_matrix_h1,
-                                                const float *i_matrix_h2,
-                                                float* o_diff,
-                                                int i_s);
+    void diff(float *i_matrix,
+              const float *i_matrix_h1,
+              const float *i_matrix_h2,
+              float* o_diff,
+              int i_s);
+
+    /**
+     * Prints hex values of a float matrix.
+     *
+     * @param i_matrix matrix with float values.
+     * @param i_m number of rows
+     * @param i_n number of cols
+     **/
+    void print_mat(const float *i_matrix, int i_m, int i_n);
   
     /**
-     * converts matrix A to two bfloat16 matrices.
+     * Converts matrix A to two bfloat16 matrices.
      *
      * @param i_matrix matrix A which contains the original value.
      * @param o_matrix_bf16_h1 matrix contains the first half in BF16.

@@ -26,6 +26,17 @@ void rat_gemm::backend::ConvertMatrix::diff(float *i_matrix, const float *i_matr
   }
 }
 
+void rat_gemm::backend::ConvertMatrix::print_mat(const float *i_matrix, int rows, int columns) {
+  for (int r = 0; r < rows; ++r) {
+    for (int c = 0; c < columns; ++c) {
+        libxsmm_float_uint hybrid_in = {0};
+        hybrid_in.f = i_matrix[r * columns + c];
+        printf("0x%x ", hybrid_in.u);
+    }
+    printf("\n");
+  }
+}
+
 void rat_gemm::backend::ConvertMatrix::convert_fp32_two_bf16(const float* i_matrix,
                                                              libxsmm_bfloat16* o_matrix_bf16_h1,
                                                              libxsmm_bfloat16* o_matrix_bf16_h2,

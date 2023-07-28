@@ -15,6 +15,10 @@ $(info $$LDFLAGS is [${LDFLAGS}])
 
 all: test
 
+bf16_gemm: src/BF16RatGemm.cpp src/BF16RatGemm.test.cpp
+		$(CXX) ${OPTIONS} ${CXXFLAGS} -c src/BF16RatGemm.cpp -o ${BUILD_DIR}/BF16RatGemm.o
+		$(CXX) ${OPTIONS} ${CXXFLAGS} -c src/BF16RatGemm.test.cpp -o ${BUILD_DIR}/tests/BF16RatGemm.test.o
+
 bf16_matrix: src/backend/ConvertMatrix.cpp src/backend/ConvertMatrix.test.cpp
 		$(CXX) ${OPTIONS} ${CXXFLAGS} -c src/backend/ConvertMatrix.cpp -o ${BUILD_DIR}/backend/ConvertMatrix.o
 		$(CXX) ${OPTIONS} ${CXXFLAGS} -c src/backend/ConvertMatrix.test.cpp -o ${BUILD_DIR}/tests/backend/ConvertMatrix.test.o
@@ -31,7 +35,7 @@ rat_gemm: src/RatGemm.cpp src/RatGemm.test.cpp
 		$(CXX) ${OPTIONS} ${CXXFLAGS} -c src/RatGemm.cpp -o ${BUILD_DIR}/RatGemm.o
 		$(CXX) ${OPTIONS} ${CXXFLAGS} -c src/RatGemm.test.cpp -o ${BUILD_DIR}/tests/RatGemm.test.o
 
-test: bf16_matrix rational_matrix operations rat_gemm
+test: bf16_gemm bf16_matrix rational_matrix operations rat_gemm
 		$(CXX) ${CXXFLAGS} src/test.cpp ${BUILD_DIR}/*.o ${BUILD_DIR}/backend/*.o ${BUILD_DIR}/tests/*.test.o ${BUILD_DIR}/tests/backend/*.test.o ${LDFLAGS} -o ${BUILD_DIR}/test_all
 
 $(shell mkdir -p build/backend)

@@ -87,14 +87,12 @@ int main() {
   for (int64_t idx : l_nonZeroIndices) {
     std::cout << "Column " << idx << " is non-zero." << std::endl;
   }
-  std::vector<libxsmm_bfloat16> l_mat_padded;
 
+  std::vector<libxsmm_bfloat16> l_mat_padded;
 
   pad_cols(l_vec_1, l_vec_2, l_nonZeroIndices, l_mat_padded, i_m, i_n);
 
-
   printAsMatrix(l_mat_padded, i_m, (i_n + l_nonZeroIndices.size()));
-
 
   return 0;
 }
