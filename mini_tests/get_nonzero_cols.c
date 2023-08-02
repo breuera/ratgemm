@@ -6,12 +6,12 @@
 #include <libxsmm.h>
 
 
-std::vector<int64_t> ColNonZero(const std::vector<libxsmm_bfloat16>& vec_2nd, int i_m, int i_n){
+std::vector<int64_t> ColNonZero(const std::vector<libxsmm_bfloat16>& i_vec, int i_m, int i_n){
   std::vector<int64_t> nonZeroIndices;
 
   for (int j = 0; j < i_n; ++j) {
       for (int i = 0; i < i_m; ++i) {
-          if (vec_2nd[i * i_n + j] != 0) {
+          if (i_vec[i * i_n + j] != 0) {
               nonZeroIndices.push_back(j);
               break;
           }

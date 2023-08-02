@@ -5,6 +5,24 @@
 
 #include <libxsmm.h>
 
+std::vector<int64_t> RowNonZero(const std::vector<libxsmm_bfloat16>& i_vec, int i_m, int i_n){
+    std::vector<int64_t> nonZeroIndices;
+
+    for (int i = 0; i < i_m; ++i) {
+        bool rowHasNonZero = false;
+        for (int j = 0; j < i_n; ++j) {
+            if (i_vec[i * i_n + j] != 0) {
+                rowHasNonZero = true;
+                break;
+            }
+        }
+        if (rowHasNonZero) {
+            nonZeroIndices.push_back(i);
+        }
+    }
+    return nonZeroIndices;
+}
+
 void pad_rows(const std::vector<libxsmm_bfloat16>& i_vec_1, const std::vector<libxsmm_bfloat16>& i_vec_2, const std::vector<int64_t>& i_indices, std::vector<libxsmm_bfloat16>& o_mat_padded, const int64_t i_m, const int64_t i_n) {
   // Copy mat
   for (int64_t l_n = 0; l_n < i_n; l_n++) {
@@ -37,28 +55,33 @@ void printAsMatrix(const std::vector<libxsmm_bfloat16>& vec, int i_m, int i_n) {
 }
 
 int main() {
-  int i_m = 35;
+  int i_m = 5;
   int i_n = 7;
 
-  libxsmm_bfloat16 l_matrix_1[i_m][i_n] = { 0 };
+  libxsmm_bfloat16 l_matrix_1[i_m][i_n] = {{0, 0, 1, 2, 0, 4, 5},
+                                            {0, 2, 0, 0, 0, 0, 0},
+                                            {0, 0, 7, 8, 7, 10, 11},
+                                            {5, 0, 0, 0, 0, 0, 0},
+                                            {0, 0, 13, 14, 0, 16, 17}};
 
-  for( int64_t l_qt = 0; l_qt < i_m; l_qt++ ) {
-    for( int64_t l_md = 0; l_md < i_n; l_md++ ) {
-      l_matrix_1[l_qt][l_md] = (libxsmm_bfloat16) (rand())/500;
-    }
-  }
+  libxsmm_bfloat16 l_matrix_2[i_m][i_n] = {{0, 0, 1, 2, 0, 4, 13},
+                                            {0, 0, 0, 0, 0, 0, 0},
+                                            {0, 0, 7, 8, 0, 10, 13},
+                                            {0, 0, 0, 0, 0, 0, 0},
+                                            {0, 0, 13, 14, 0, 16, 13}};
 
   std::vector<libxsmm_bfloat16> l_vec_1(l_matrix_1[0], l_matrix_1[0] + i_m * i_n);
+  std::vector<libxsmm_bfloat16> l_vec_2(l_matrix_2[0], l_matrix_2[0] + i_m * i_n);
 
   // Get the indices of non-zero columns
-  std::vector<int64_t> l_nonZeroIndices = {2,5};
+  std::vector<int64_t> l_nonZeroIndices = RowNonZero(l_vec_2, i_m, i_n);
 
   // for (int64_t idx : l_nonZeroIndices) {
   //   std::cout << "Row " << idx << " is non-zero." << std::endl;
   // }
   std::vector<libxsmm_bfloat16> l_mat_padded;
 
-  pad_rows(l_vec_1, l_vec_1, l_nonZeroIndices, l_mat_padded, i_m, i_n);
+  pad_rows(l_vec_1, l_vec_2, l_nonZeroIndices, l_mat_padded, i_m, i_n);
 
   printAsMatrix(l_mat_padded, i_m + l_nonZeroIndices.size() , i_n );
 

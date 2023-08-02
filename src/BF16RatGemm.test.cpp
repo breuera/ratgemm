@@ -123,46 +123,33 @@ double stiff_test[3][35][35] = {
 
 TEST_CASE( "my test" ) {
   // convert matrices to single precision and chop of zero blocks
-  // float l_stiff_fp32[3][35][20];
+  float l_stiff_fp32[3][35][20];
 
-  // for( int64_t l_di = 0; l_di < 3; l_di++ ) {
-  //   for( int64_t l_n = 0; l_n < 35; l_n++ ) {
-  //     for( int64_t l_m = 0; l_m < 20; l_m++ ) {
-  //       l_stiff_fp32[l_di][l_n][l_m] = stiff_test[l_di][l_n][l_m];
-  //     }
-  //   }
-  // }
-
-  // int l_m_stiff = 35;
-  // int l_n_stiff = 3*20;
-
-  // // adjust data layout to single matrix with 3*M
-  // float l_stiff_single[35][3*20];
-  // for( int64_t l_di = 0; l_di < 3; l_di++ ) {
-  //   for( int64_t l_n = 0; l_n < 35; l_n++ ) {
-  //     for( int64_t l_m = 0; l_m < 20; l_m++ ) {
-  //       int64_t l_m_single = l_di*20 + l_m;
-
-  //       l_stiff_single[l_n][l_m_single] = l_stiff_fp32[l_di][l_n][l_m];
-  //     }
-  //   }
-  // }
-
-  int l_m_stiff = 35;
-  int l_n_stiff = 20;
-  
-  float l_stiff_single_test[35][20];
-    for( int64_t l_qt = 0; l_qt < l_m_stiff; l_qt++ ) {
-    for( int64_t l_md = 0; l_md < l_n_stiff; l_md++ ) {
-      l_stiff_single_test[l_qt][l_md] = (float) (rand()) / (float) (RAND_MAX)/500;
+  for( int64_t l_di = 0; l_di < 3; l_di++ ) {
+    for( int64_t l_n = 0; l_n < 35; l_n++ ) {
+      for( int64_t l_m = 0; l_m < 20; l_m++ ) {
+        l_stiff_fp32[l_di][l_n][l_m] = stiff_test[l_di][l_n][l_m];
+      }
     }
   }
 
-/// okish
+  int l_m_stiff = 35;
+  int l_n_stiff = 3*20;
+
+  // adjust data layout to single matrix with 3*M
+  float l_stiff_single[35][3*20];
+  for( int64_t l_di = 0; l_di < 3; l_di++ ) {
+    for( int64_t l_n = 0; l_n < 35; l_n++ ) {
+      for( int64_t l_m = 0; l_m < 20; l_m++ ) {
+        int64_t l_m_single = l_di*20 + l_m;
+
+        l_stiff_single[l_n][l_m_single] = l_stiff_fp32[l_di][l_n][l_m];
+      }
+    }
+  }
+
   int l_m_dof = 9;
   int l_n_dof = 35;
-  // int l_m_dof = 2;
-  // int l_n_dof = 3;
   
   // generate random dofs
   float l_dofs[9][35] = { 0 };
@@ -176,33 +163,101 @@ TEST_CASE( "my test" ) {
   // Convert stiff to two BF16
   int64_t l_s_stiff = l_m_stiff * l_n_stiff;
 
-  libxsmm_bfloat16* o_stiff_bf16_h1 = new libxsmm_bfloat16[l_s_stiff];
-  libxsmm_bfloat16* o_stiff_bf16_h2 = new libxsmm_bfloat16[l_s_stiff];
+  libxsmm_bfloat16* l_stiff_bf16_h1 = new libxsmm_bfloat16[l_s_stiff];
+  libxsmm_bfloat16* l_stiff_bf16_h2 = new libxsmm_bfloat16[l_s_stiff];
 
   rat_gemm::backend::ConvertMatrix l_conv_stiff;
-  l_conv_stiff.convert_fp32_two_bf16(l_stiff_single_test[0], o_stiff_bf16_h1, o_stiff_bf16_h2, l_s_stiff);
+  l_conv_stiff.convert_fp32_two_bf16(l_stiff_single[0], l_stiff_bf16_h1, l_stiff_bf16_h2, l_s_stiff);
 
   rat_gemm::BF16RatGemm l_rat_stiff;
-  std::vector<int64_t> l_nz_idx = l_rat_stiff.col_nz(o_stiff_bf16_h2, l_m_stiff, l_n_stiff);
+  std::vector<int64_t> l_nz_idx = l_rat_stiff.row_nz(l_stiff_bf16_h2, l_m_stiff, l_n_stiff);
+  // for (int64_t idx : l_nz_idx) {
+  //   std::cout << "Row " << idx << " is non-zero." << std::endl;
+  // }
 
-  std::vector<libxsmm_bfloat16> l_padded_stiff = l_rat_stiff.pad_cols(o_stiff_bf16_h1, o_stiff_bf16_h2, l_nz_idx, l_m_stiff, l_n_stiff);
+  std::vector<libxsmm_bfloat16> l_padded_stiff = l_rat_stiff.pad_rows(l_stiff_bf16_h1, l_stiff_bf16_h2, l_nz_idx, l_m_stiff, l_n_stiff);
 
-  // l_rat_stiff.print_like_mat(l_padded_stiff, l_m_stiff, (l_n_stiff + l_nz_idx.size()));
+  // l_rat_stiff.print_like_mat(l_padded_stiff, (l_m_stiff + l_nz_idx.size()), l_n_stiff);
 
   // Convert and extend DoFs for gemm
   int64_t l_s_dof = l_m_dof * l_n_dof;
-  libxsmm_bfloat16* o_dof_bf16_h1 = new libxsmm_bfloat16[l_s_dof];
-  libxsmm_bfloat16* o_dof_bf16_h2 = new libxsmm_bfloat16[l_s_dof];
+  libxsmm_bfloat16* l_dof_bf16_h1 = new libxsmm_bfloat16[l_s_dof];
+  libxsmm_bfloat16* l_dof_bf16_h2 = new libxsmm_bfloat16[l_s_dof];
 
   rat_gemm::backend::ConvertMatrix conv_dof;
-  conv_dof.convert_fp32_two_bf16(l_dofs[0], o_dof_bf16_h1, o_dof_bf16_h2, l_s_dof);
+  conv_dof.convert_fp32_two_bf16(l_dofs[0], l_dof_bf16_h1, l_dof_bf16_h2, l_s_dof);
 
   rat_gemm::BF16RatGemm l_rat_dof;
+  std::vector<libxsmm_bfloat16> l_padded_dof_1 = l_rat_dof.pad_cols(l_dof_bf16_h1, l_dof_bf16_h1, l_nz_idx, l_m_dof, l_n_dof);
+  std::vector<libxsmm_bfloat16> l_padded_dof_2 = l_rat_dof.pad_cols(l_dof_bf16_h2, l_dof_bf16_h2, l_nz_idx, l_m_dof, l_n_dof);
   
-  std::vector<libxsmm_bfloat16> l_padded_dof_1 = l_rat_dof.pad_rows(o_dof_bf16_h1, o_dof_bf16_h1, l_nz_idx, l_m_dof, l_n_dof);
+  // l_rat_dof.print_like_mat(l_padded_dof_1, l_m_dof, (l_n_dof + l_nz_idx.size()));
 
-  // std::vector<libxsmm_bfloat16> l_padded_dof_2 = l_rat_dof.pad_rows(o_dof_bf16_h2, o_dof_bf16_h2, l_nz_idx, l_m_dof, l_n_dof);
+  libxsmm_bfloat16* l_dof_1 = l_padded_dof_1.data();
+  libxsmm_bfloat16* l_dof_2 = l_padded_dof_2.data();
+  libxsmm_bfloat16* l_stiff = l_padded_stiff.data();
 
-  l_rat_dof.print_like_mat(l_padded_dof_1, l_m_dof + l_nz_idx.size(), l_n_dof);
+  // l_result: matmul of 3 rational matrices with multiple DOFs after bf16.
+  float* l_result = new float[l_m_dof * l_n_stiff];
+
+  // int m = 9;
+  // int n = 3 * 20;
+  // int k = 35 + l_nz_idx.size();
+
+  l_result = l_rat_stiff.bf16_gemm(l_dof_1, l_dof_2, l_stiff, l_m_dof, l_n_dof + l_nz_idx.size(), l_n_stiff);
+
+  // std::cout << "\nDOF 1:" << std::endl;
+  // l_rat_stiff.print_mat((libxsmm_bfloat16*)l_dof_1, l_m_dof, l_n_dof + l_nz_idx.size());
+  // std::cout << "\nDOF 2:" << std::endl;
+  // l_rat_stiff.print_mat((libxsmm_bfloat16*)l_dof_2, l_m_dof, l_n_dof + l_nz_idx.size());
+  // std::cout << "\nstiff:" << std::endl;
+  // l_rat_stiff.print_mat((libxsmm_bfloat16*)l_stiff, l_m_stiff + l_nz_idx.size(), l_n_stiff);
+
+  std::cout << "\nresult:" << std::endl;
+  for (int row = 0; row < l_m_dof; ++row) {
+    for (int col = 0; col < l_n_stiff; ++col) {
+      // Print the element value with a tab separator
+      std::cout << l_result[row * l_n_stiff + col] << "   ";
+    }
+    // Move to the next row after printing all elements in the current row
+    std::cout << std::endl;
+  }
+  std::cout << std::endl;
+  std::cout << std::endl;
+  std::cout << std::endl;
+  std::cout << std::endl;
+
+  // l_reference: real matmul of 3 rational matrices with multiple DOFs.
+  float l_reference[9][3][35] = { 0 };
+
+  for( int64_t l_di = 0; l_di < 3; l_di++ ) {
+    for( int64_t l_m = 0; l_m < 35; l_m++ ) {
+      for( int64_t l_n = 0; l_n < 9; l_n++ ) {
+        for( int64_t l_k = 0; l_k < 35; l_k++ ) {
+          l_reference[l_di][l_n][l_m] +=  stiff_test[l_di][l_k][l_m] * l_dofs[l_n][l_k];
+        }
+      }
+    }
+  }
+
+  // std::cout << "\n reference:" << std::endl;
+  // for (int i = 0; i < 9; ++i) {
+  //   for (int j = 0; j < 3; ++j) {
+  //     for (int k = 0; k < 35; ++k) {
+  //       std::cout << l_reference[i][j][k] << "   ";
+  //     }
+  //      std::cout << std::endl;
+  //   }
+  // }
+
+  for( int64_t l_di = 0; l_di < 3; l_di++ ) {
+    for( int64_t l_n = 0; l_n < 9; l_n++ ) {
+      for( int64_t l_m = 0; l_m < 20; l_m++ ) {
+        int64_t l_id_rat = l_di*20 + l_m;
+        // std::cout << l_result[l_n * l_m_dof + l_id_rat] << "\t";
+        // REQUIRE( l_reference[l_di][l_n][l_m] == Approx(l_result[l_n * l_m_dof + l_id_rat]) );
+      }
+    }
+  }
 
 }
