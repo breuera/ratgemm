@@ -6,21 +6,20 @@
 #include <libxsmm.h>
 
 std::vector<int64_t> RowNonZero(const std::vector<libxsmm_bfloat16>& i_vec, int i_m, int i_n){
-    std::vector<int64_t> nonZeroIndices;
-
-    for (int i = 0; i < i_m; ++i) {
-        bool rowHasNonZero = false;
-        for (int j = 0; j < i_n; ++j) {
-            if (i_vec[i * i_n + j] != 0) {
-                rowHasNonZero = true;
-                break;
-            }
-        }
-        if (rowHasNonZero) {
-            nonZeroIndices.push_back(i);
-        }
+  std::vector<int64_t> nonZeroIndices;
+  for (int i = 0; i < i_m; ++i) {
+    bool rowHasNonZero = false;
+    for (int j = 0; j < i_n; ++j) {
+      if (i_vec[i * i_n + j] != 0) {
+        rowHasNonZero = true;
+        break;
+      }
     }
-    return nonZeroIndices;
+    if (rowHasNonZero) {
+      nonZeroIndices.push_back(i);
+    }
+  }
+  return nonZeroIndices;
 }
 
 void pad_rows(const std::vector<libxsmm_bfloat16>& i_vec_1, const std::vector<libxsmm_bfloat16>& i_vec_2, const std::vector<int64_t>& i_indices, std::vector<libxsmm_bfloat16>& o_mat_padded, const int64_t i_m, const int64_t i_n) {
