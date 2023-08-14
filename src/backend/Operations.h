@@ -41,7 +41,7 @@ class rat_gemm::backend::Operations {
                             float   * i_mat_1 );
 
     /**
-     * Initializes an SGEMM operation performan C=A*B.
+     * Initializes an SGEMM operation performance C=A*B.
      *
      * @param i_m BLAS parameter M.
      * @param i_n BLAS parameter N.

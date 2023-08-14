@@ -40,7 +40,7 @@ void rat_gemm::RatGemm::init( int64_t i_m,
                                                                          l_mat_masked,
                                                                          l_mat_err );
 
-  // TOOD: add check that matrix is represented exactly
+  // TODO: add check that matrix is represented exactly
 
   int64_t l_k_plus = l_nz_cols.size();
   int64_t l_k_padded = i_k + l_k_plus;
@@ -69,6 +69,7 @@ void rat_gemm::RatGemm::init( int64_t i_m,
 
 void rat_gemm::RatGemm::apply( float * i_b,
                                float * o_c ) {
+  // convert 2D matrix to 1D
   for( int64_t l_n = 0; l_n < m_n; l_n++ ) {
     for( int64_t l_k = 0; l_k < m_k; l_k++ ) {
       int64_t l_id_in = l_n * m_ld_b + l_k;
