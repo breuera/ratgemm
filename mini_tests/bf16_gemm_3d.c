@@ -467,12 +467,12 @@ int main() {
   // Print the elapsed time
   std::cout << "Elapsed time: " << duration << " microseconds" << std::endl;
 
-  // for (int i = 0; i < 9; i++) {
-  //   for (int j = 0; j < 3*20; j++) {
-  //     std::cout << l_result[i * (3*20) + j] << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
+  for (int i = 0; i < 9; i++) {
+    for (int j = 0; j < 3*20; j++) {
+      std::cout << l_result[i * (3*20) + j] << " ";
+    }
+    std::cout << std::endl;
+  }
 
   float l_reference[9][3][35] = { 0 };
   

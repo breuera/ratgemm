@@ -254,8 +254,8 @@ TEST_CASE( "my test" ) {
     for( int64_t l_n = 0; l_n < 9; l_n++ ) {
       for( int64_t l_m = 0; l_m < 20; l_m++ ) {
         int64_t l_id_rat = l_di*20 + l_m;
-        // std::cout << l_result[l_n * l_m_dof + l_id_rat] << "\t";
-        // REQUIRE( l_reference[l_di][l_n][l_m] == Approx(l_result[l_n * l_m_dof + l_id_rat]) );
+        std::cout << l_result[l_n * l_m_dof + l_id_rat] << "\t";
+        REQUIRE( l_reference[l_di][l_n][l_m] == Approx(l_result[l_n * l_m_dof + l_id_rat]) );
       }
     }
   }

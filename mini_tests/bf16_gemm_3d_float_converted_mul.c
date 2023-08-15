@@ -217,17 +217,17 @@ float* bf16_gemm(libxsmm_bfloat16* i_dof_1,
         int idx_dof = row * i_k + k;
         int idx_stiff = k * i_n + col;
         float val_dof = bfloat16_to_float(i_dof_1[idx_dof]);
-        std::cout << row+col << ": " << val_dof << " * ";
+        // std::cout << row+col << ": " << val_dof << " * ";
         float val_stiff = bfloat16_to_float(i_stiff[idx_stiff]);
-        std::cout << val_stiff << " + ";
+        // std::cout << val_stiff << " + ";
         sum += val_dof * val_stiff;
       }
-      std::cout << " = " << sum << std:: endl;
+      // std::cout << " = " << sum << std:: endl;
       o_result_1[row * i_n + col] = sum;
     }
   }
 
-   std::cout << "22222222222222222222222222222222222222222222222222222222" << std:: endl;
+  //  std::cout << "22222222222222222222222222222222222222222222222222222222" << std:: endl;
 
   // Perform matrix-matrix multiplication: i_dof_2 * i_stiff
   for (int row = 0; row < i_m; row++) {
@@ -238,21 +238,21 @@ float* bf16_gemm(libxsmm_bfloat16* i_dof_1,
         int idx_stiff = k * i_n + col;
         float val_dof = bfloat16_to_float(i_dof_2[idx_dof]);
         float val_stiff = bfloat16_to_float(i_stiff[idx_stiff]);
-        std::cout << row+col << ": " << val_dof << " * ";
-        std::cout << val_stiff  << " + ";
+        // std::cout << row+col << ": " << val_dof << " * ";
+        // std::cout << val_stiff  << " + ";
         sum += val_dof * val_stiff;
       }
-      std::cout << " = " << sum << std:: endl;
+      // std::cout << " = " << sum << std:: endl;
       o_result_2[row * i_n + col] += sum;
     }
   }
 
   for (int row = 0; row < i_m; row++) {
     for (int col = 0; col < i_n; col++) {
-      std::cout << o_result_1[row * i_n + col] << " + ";
-      std::cout << o_result_2[row * i_n + col] << " = ";
+      // std::cout << o_result_1[row * i_n + col] << " + ";
+      // std::cout << o_result_2[row * i_n + col] << " = ";
       o_result[row * i_n + col] = o_result_1[row * i_n + col] + o_result_2[row * i_n + col];
-      std::cout << o_result[row * i_n + col] << std::endl;
+      // std::cout << o_result[row * i_n + col] << std::endl;
     }
   }
   return o_result;
@@ -366,53 +366,53 @@ void pad_cols(const std::vector<libxsmm_bfloat16>& io_vec_1, const std::vector<l
 
 int main() {
 
-  // Select the desired elements to keep 3 * 10 * 5
-  std::vector<std::vector<std::vector<double>>> new_stiff_test(3, std::vector<std::vector<double>>(10, std::vector<double>(5)));
+  // Select the desired elements to keep 3 * 35 * 20
+  std::vector<std::vector<std::vector<double>>> new_stiff_test(3, std::vector<std::vector<double>>(35, std::vector<double>(20)));
 
   for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 10; j++) {
-      for (int k = 0; k < 5; k++) {
+    for (int j = 0; j < 35; j++) {
+      for (int k = 0; k < 20; k++) {
         new_stiff_test[i][j][k] = stiff_test[i][j][k];
       }
     }
   }
 
-  float l_stiff_fp32[3][10][5];
+  float l_stiff_fp32[3][35][20];
 
   for( int64_t l_di = 0; l_di < 3; l_di++ ) {
-    for( int64_t l_n = 0; l_n < 10; l_n++ ) {
-      for( int64_t l_m = 0; l_m < 5; l_m++ ) {
+    for( int64_t l_n = 0; l_n < 35; l_n++ ) {
+      for( int64_t l_m = 0; l_m < 20; l_m++ ) {
         l_stiff_fp32[l_di][l_n][l_m] = new_stiff_test[l_di][l_n][l_m];
       }
     }
   }
 
-  int l_m_stiff = 10;
-  int l_n_stiff = 3*5;
+  int l_m_stiff = 35;
+  int l_n_stiff = 3*20;
 
   // adjust data layout to single matrix with 3*M
-  float l_stiff_single[10][3*5];
+  float l_stiff_single[35][3*20];
   for( int64_t l_di = 0; l_di < 3; l_di++ ) {
-    for( int64_t l_n = 0; l_n < 10; l_n++ ) {
-      for( int64_t l_m = 0; l_m < 5; l_m++ ) {
-        int64_t l_m_single = l_di*5 + l_m;
+    for( int64_t l_n = 0; l_n < 35; l_n++ ) {
+      for( int64_t l_m = 0; l_m < 20; l_m++ ) {
+        int64_t l_m_single = l_di*20 + l_m;
         l_stiff_single[l_n][l_m_single] = l_stiff_fp32[l_di][l_n][l_m];
       }
     }
   }
 
   int l_m_dof = 2;
-  int l_n_dof = 10;
+  int l_n_dof = 35;
 
-  float* l_dof = new float[l_m_dof * l_n_dof];
+  float* l_dofs = new float[l_m_dof * l_n_dof];
   
   // Initialize input matrices with some values
-  init(l_dof, l_m_dof, l_n_dof);
+  init(l_dofs, l_m_dof, l_n_dof);
 
   // // Display the main stiff with depth 3
   // for (int i = 0; i < 3; i++) {
-  //   for (int j = 0; j < 10; j++) {
-  //     for (int k = 0; k < 5; k++) {
+  //   for (int j = 0; j < 35; j++) {
+  //     for (int k = 0; k < 20; k++) {
   //       std::cout << new_stiff_test[i][j][k] << " ";
   //     }
   //     std::cout << std::endl;
@@ -421,8 +421,8 @@ int main() {
   // }
 
   // // Display the converted to 2d
-  // for (int i = 0; i < 10; i++) {
-  //   for (int j = 0; j < 3*5; j++) {
+  // for (int i = 0; i < 35; i++) {
+  //   for (int j = 0; j < 3*20; j++) {
   //     std::cout << l_stiff_single[i][j] << " ";
   //   }
   //   std::cout << std::endl;
@@ -436,12 +436,12 @@ int main() {
   libxsmm_bfloat16* l_stiff_2 = new libxsmm_bfloat16[l_m_stiff * l_n_stiff];
 
   convert_fp32_two_bf16((const float *)l_stiff_single, l_stiff_1, l_stiff_2, l_m_stiff * l_n_stiff);
-  convert_fp32_two_bf16((const float *)l_dof, l_dof_1, l_dof_2, l_m_dof * l_n_dof);
+  convert_fp32_two_bf16((const float *)l_dofs, l_dof_1, l_dof_2, l_m_dof * l_n_dof);
 
   // // Display the values in float converted to bf16
-  // for (int i = 0; i < 10; i++) {
-  //   for (int j = 0; j < 3*5; j++) {
-  //     std::cout << bfloat16_to_float(l_stiff_2[i * (3*5) + j]) << " ";
+  // for (int i = 0; i < 35; i++) {
+  //   for (int j = 0; j < 3*20; j++) {
+  //     std::cout << bfloat16_to_float(l_stiff_2[i * (3*20) + j]) << " ";
   //   }
   //   std::cout << std::endl;
   // }
@@ -469,8 +469,8 @@ int main() {
 
   // // Display the values in float converted to bf16 dof 1
   // for (int i = 0; i < 2; i++) {
-  //   for (int j = 0; j < 10; j++) {
-  //     std::cout << bfloat16_to_float(l_dof_1[i * (10) + j]) << " ";
+  //   for (int j = 0; j < 35; j++) {
+  //     std::cout << bfloat16_to_float(l_dof_1[i * (35) + j]) << " ";
   //   }
   //   std::cout << std::endl;
   // }
@@ -481,11 +481,48 @@ int main() {
 
   l_result = bf16_gemm((libxsmm_bfloat16 *)l_dof_1_padded.data(), (libxsmm_bfloat16 *)l_dof_2_padded.data(), (libxsmm_bfloat16 *)l_stiff_padded.data(), l_m_dof, l_n_stiff, l_m_stiff + l_nz_idx.size());
 
-  for (int i = 0; i < 2; i++) {
-    for (int j = 0; j < 3*5; j++) {
-      std::cout << l_result[i * (3*5) + j] << " ";
+  for (int i = 0; i < 9; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      for (int k = 0; k < 20; ++k) {
+        std::cout << l_result[(i * 3 * 20) + (j * 20) + k] << "   ";
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
+  }
+
+
+  float l_reference[9][3][35] = { 0 };
+  
+  for( int64_t l_di = 0; l_di < 3; l_di++ ) {
+    for( int64_t l_m = 0; l_m < 35; l_m++ ) {
+      for( int64_t l_n = 0; l_n < 9; l_n++ ) {
+        for( int64_t l_k = 0; l_k < 35; l_k++ ) {
+          l_reference[l_di][l_n][l_m] +=  stiff_test[l_di][l_k][l_m] * l_dofs[l_n* l_n_dof +l_k];
+        }
+      }
+    }
+  }
+
+  std::cout << "\nReference:" << std::endl;
+  for (int i = 0; i < 9; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      for (int k = 0; k < 35; ++k) {
+        std::cout << l_reference[i][j][k] << "   ";
+      }
+       std::cout << std::endl;
+    }
+  }
+
+   float l_diff[9][3][20] = { 0 };
+   std::cout << "\nDifference:" << std::endl;
+   for (int i = 0; i < 9; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      for (int k = 0; k < 20; ++k) {
+        l_diff[i][j][k] = l_reference[i][j][k] - l_result[(i * 3 * 20) + (j * 20) + k];
+        std::cout << l_diff[i][j][k] << "   ";
+      }
+       std::cout << std::endl;
+    }
   }
 
   return 0;
