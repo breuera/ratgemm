@@ -9,3 +9,6 @@ wget https://github.com/catchorg/Catch2/releases/download/v2.13.9/catch.hpp -O .
 
 make all
 ./build/test_all
+
+
+https://github.com/libxsmm/libxsmm/blob/c38c752f2d6dba92ffcbecc5f40d2bd652684d00/samples/equation/equation_matmul.c#L25

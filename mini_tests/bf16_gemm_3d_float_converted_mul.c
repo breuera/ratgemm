@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <cstdint>
+#include <chrono>
 #include <iomanip> // For setting precision when printing floating-point values
 #include <random> // For random number generation
 #include <libxsmm.h>
@@ -133,31 +134,65 @@ void bf16_gemm(libxsmm_bfloat16* i_dof_1,
                libxsmm_bfloat16* i_dof_2,
                libxsmm_bfloat16* i_stiff,
                float* o_result,
-               int i_m,
-               int i_n,
-               int i_k){
-
+               libxsmm_blasint i_m, //9
+               libxsmm_blasint i_n, // 3*20
+               libxsmm_blasint i_k){ //35
   for (int row = 0; row < i_m; row++) {
     for (int col = 0; col < i_n; col++) {
-      float sum = 0.0f;
+      float acc = 0.f;
       for (int k = 0; k < i_k; k++) {
-        int idx_dof = row * i_k + k;
-        int idx_stiff = k * i_n + col;
-        float val_dof = bfloat16_to_float(i_dof_1[idx_dof]);
-        float val_stiff = bfloat16_to_float(i_stiff[idx_stiff]);
-        o_result[row * i_n + col] += val_dof * val_stiff;
+        float val_dof_1_fp32 = bfloat16_to_float(i_dof_1[row * i_k + k]);
+        float val_dof_2_fp32 = bfloat16_to_float(i_dof_2[row * i_k + k]);
+        float val_stiff = bfloat16_to_float(i_stiff[k * i_n + col]);
+        acc += (val_dof_1_fp32 * val_stiff)+ (val_dof_2_fp32 * val_stiff);
       }
+      o_result[row * i_n + col] += acc;
     }
   }
+}
 
-  // Perform matrix-matrix multiplication: i_dof_2 * i_stiff
+void bf16_gemm_one(libxsmm_bfloat16* i_dof,
+                   libxsmm_bfloat16* i_stiff,
+                   float* o_result,
+                   libxsmm_blasint i_m, //9
+                   libxsmm_blasint i_n, //3*20
+                   libxsmm_blasint i_k){ //35
   for (int row = 0; row < i_m; row++) {
     for (int col = 0; col < i_n; col++) {
+      float acc = 0.f;
       for (int k = 0; k < i_k; k++) {
-        float val_dof = bfloat16_to_float(i_dof_2[row * i_k + k]);
-        float val_stiff = bfloat16_to_float(i_stiff[k * i_n + col]);
-        o_result[row * i_n + col] += val_dof * val_stiff;
+        float val_dof = bfloat16_to_float(i_dof[row * i_k + k]);
+        float val_stiff = bfloat16_to_float(i_stiff[k * 20 + col + col * col/20]);
+        acc += val_dof * val_stiff;
       }
+      o_result[row * i_n/3 + row * col/20  + col] += acc;
+    }
+  }
+}
+
+float upconvert_bf16(libxsmm_bfloat16 x) {
+  libxsmm_bfloat16_f32 bf16_hp;
+  bf16_hp.i[1] = x;
+  bf16_hp.i[0] = 0;
+  return bf16_hp.f;
+}
+
+void bf16_gemm_upconvert(libxsmm_bfloat16* i_dof,
+                         libxsmm_bfloat16* i_stiff,
+                         float* o_result,
+                         libxsmm_blasint i_m, // 9
+                         libxsmm_blasint i_n, // 3 * 20
+                         libxsmm_blasint i_k) { // 35
+  libxsmm_blasint i, j, l;
+  for (j = 0; j < i_n; j++) {
+    for (i = 0; i < i_m; i++) {
+      float acc = 0.f;
+      for (l = 0; l < i_k; l++) {
+        float val_dof = upconvert_bf16(i_dof[i + l * i_m]); // Convert i_dof to float
+        float val_stiff = upconvert_bf16(i_stiff[l + j * i_k]); // Convert i_stiff to float
+        acc += val_dof * val_stiff;
+      }
+      o_result[i + j * i_m] += acc;
     }
   }
 }
@@ -404,9 +439,72 @@ int main() {
   // std::cout << "\n-----------------------Padded dof2 col:--------------------------------\n";
   // printAsMatrix(l_dof_2_padded, 9, 35 + l_nz_idx.size());
 
+  // First test
   float l_result[9][3][20] = { 0 };
 
-  bf16_gemm((libxsmm_bfloat16 *)l_dof_1_padded.data(), (libxsmm_bfloat16 *)l_dof_2_padded.data(), (libxsmm_bfloat16 *)l_stiff_padded.data(), (float *)l_result, 9, 3*20, 35 + l_nz_idx.size());
+  auto start = std::chrono::high_resolution_clock::now();
+
+  bf16_gemm((libxsmm_bfloat16 *)l_dof_1_padded.data(),
+            (libxsmm_bfloat16 *)l_dof_2_padded.data(),
+            (libxsmm_bfloat16 *)l_stiff_padded.data(),
+            (float *)l_result,
+            9,
+            3 * 20,
+            35 + l_nz_idx.size());
+
+  auto end = std::chrono::high_resolution_clock::now();
+
+  std::chrono::duration<double> duration = end - start;
+  std::cout << "Execution time: " << duration.count() << " seconds" << std::endl;
+
+  // Second test
+  // float l_result[9][3][20] = { 0 };
+
+  // auto start = std::chrono::high_resolution_clock::now();
+
+  // bf16_gemm_one((libxsmm_bfloat16 *)l_dof_1_padded.data(),
+  //               (libxsmm_bfloat16 *)l_stiff_padded.data(),
+  //               (float *)l_result,
+  //               9,
+  //               3 * 20,
+  //               35 + l_nz_idx.size());
+
+  // bf16_gemm_one((libxsmm_bfloat16 *)l_dof_2_padded.data(),
+  //               (libxsmm_bfloat16 *)l_stiff_padded.data(),
+  //               (float *)l_result,
+  //               9,
+  //               3 * 20,
+  //               35 + l_nz_idx.size());
+
+  // auto end = std::chrono::high_resolution_clock::now();
+
+  // std::chrono::duration<double> duration = end - start;
+  // std::cout << "Execution time: " << duration.count() << " seconds" << std::endl;
+
+
+  // Third test
+  // float l_result[9][3][20] = { 0 };
+
+  // auto start = std::chrono::high_resolution_clock::now();
+
+  // bf16_gemm_upconvert((libxsmm_bfloat16 *)l_dof_1_padded.data(),
+  //                     (libxsmm_bfloat16 *)l_stiff_padded.data(),
+  //                     (float *)l_result,
+  //                     9,
+  //                     3 * 20,
+  //                     35 + l_nz_idx.size());
+
+  // bf16_gemm_upconvert((libxsmm_bfloat16 *)l_dof_2_padded.data(),
+  //                     (libxsmm_bfloat16 *)l_stiff_padded.data(),
+  //                     (float *)l_result,
+  //                     9,
+  //                     3 * 20,
+  //                     35 + l_nz_idx.size());
+
+  // auto end = std::chrono::high_resolution_clock::now();
+
+  // std::chrono::duration<double> duration = end - start;
+  // std::cout << "Execution time: " << duration.count() << " seconds" << std::endl;
 
   std::cout << "\n-----------------------Result:--------------------------------\n";
   for (int i = 0; i < 3; ++i) {
@@ -419,7 +517,8 @@ int main() {
   }
 
   float l_reference[9][3][35] = { 0 };
-  
+  // auto start = std::chrono::high_resolution_clock::now();
+
   for( int64_t l_di = 0; l_di < 3; l_di++ ) {
     for( int64_t l_m = 0; l_m < 35; l_m++ ) {
       for( int64_t l_n = 0; l_n < 9; l_n++ ) {
@@ -429,6 +528,11 @@ int main() {
       }
     }
   }
+
+  //  auto end = std::chrono::high_resolution_clock::now();
+
+  // std::chrono::duration<double> duration = end - start;
+  // std::cout << "Execution time: " << duration.count() << " seconds" << std::endl;
 
   std::cout << "\n-----------------------Reference:--------------------------------" << std::endl;
   for (int i = 0; i < 3; ++i) {
@@ -440,17 +544,17 @@ int main() {
     }
   }
 
-   float l_diff[9][3][20] = { 0 };
-   std::cout << "\n-----------------------Difference:--------------------------------\n";
-   for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 9; ++j) {
-      for (int k = 0; k < 20; ++k) {
-        l_diff[i][j][k] = l_reference[i][j][k] - l_result[i][j][k];
-        std::cout << l_diff[i][j][k] << "   ";
-      }
-       std::cout << std::endl;
-    }
-  }
+  //  float l_diff[9][3][20] = { 0 };
+  //  std::cout << "\n-----------------------Difference:--------------------------------\n";
+  //  for (int i = 0; i < 3; ++i) {
+  //   for (int j = 0; j < 9; ++j) {
+  //     for (int k = 0; k < 20; ++k) {
+  //       l_diff[i][j][k] = l_reference[i][j][k] - l_result[i][j][k];
+  //       std::cout << l_diff[i][j][k] << "   ";
+  //     }
+  //      std::cout << std::endl;
+  //   }
+  // }
 
   delete[] l_dofs;
   delete[] l_dof_1;
