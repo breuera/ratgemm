@@ -122,35 +122,34 @@ double stiff_test[3][35][35] = {
   },
 };
 
-float bfloat16_to_float(libxsmm_bfloat16 bf16_value) {
-    uint16_t bf16_bits = static_cast<uint16_t>(bf16_value);
+float bfloat16_to_float(libxsmm_bfloat16 i_bf16_value) {
+    uint16_t bf16_bits = static_cast<uint16_t>(i_bf16_value);
     uint32_t fp32_bits = ((bf16_bits & 0x7FFF) << 16) | ((bf16_bits & 0x8000) << 16) | ((bf16_bits & 0x7F) << 13);
     float float_value;
     memcpy(&float_value, &fp32_bits, sizeof(float));
     return float_value;
 }
 
-void bf16_gemm(libxsmm_bfloat16* i_dof_1,
-               libxsmm_bfloat16* i_dof_2,
-               libxsmm_bfloat16* i_stiff,
-               float* o_result,
-               libxsmm_blasint i_m, //9
-               libxsmm_blasint i_n, // 3*20
-               libxsmm_blasint i_k){ //35
-  for (int row = 0; row < i_m; row++) {
-    for (int col = 0; col < i_n; col++) {
-      float acc = 0.f;
-      for (int k = 0; k < i_k; k++) {
-        float val_dof_1_fp32 = bfloat16_to_float(i_dof_1[row * i_k + k]);
-        float val_dof_2_fp32 = bfloat16_to_float(i_dof_2[row * i_k + k]);
-        float val_stiff = bfloat16_to_float(i_stiff[k * i_n + col]);
-        acc += (val_dof_1_fp32 * val_stiff)+ (val_dof_2_fp32 * val_stiff);
-      }
-      o_result[row * i_n + col] += acc;
-    }
-  }
+float upconvert_bf16(libxsmm_bfloat16 x) {
+  libxsmm_bfloat16_f32 bf16_hp;
+  bf16_hp.i[1] = x;
+  bf16_hp.i[0] = 0;
+  return bf16_hp.f;
+}
+/* from https://github.com/libxsmm/libxsmm/blob/78695ed5b3d924a9434d335084e4d68234473294/src/libxsmm_lpflt_quant.c#L293 libxsmm_convert_bf16_f32 */
+float upconvert_bf16_2(libxsmm_bfloat16 in) {
+  /* up-convert is super simple */
+  libxsmm_float_uint hybrid_in = { 0 };
+
+  hybrid_in.u = in;
+  /* DAZ */
+  hybrid_in.u = ( (hybrid_in.u & 0x7f80) == 0x0 ) ? (unsigned short)(hybrid_in.u & 0x8000) : hybrid_in.u;
+  hybrid_in.u = hybrid_in.u << 16;
+
+  return hybrid_in.f;
 }
 
+/* from https://github.com/libxsmm/libxsmm/blob/c38c752f2d6dba92ffcbecc5f40d2bd652684d00/samples/equation/equation_matmul.c#L25 : gemm_bf16 */
 void bf16_gemm_one(libxsmm_bfloat16* i_dof,
                    libxsmm_bfloat16* i_stiff,
                    float* o_result,
@@ -164,8 +163,8 @@ void bf16_gemm_one(libxsmm_bfloat16* i_dof,
       for( int64_t l_n = 0; l_n < i_m; l_n++ ) {
         float acc = 0.0f;
         for( int64_t l_k = 0; l_k < (i_k + i_nz_size); l_k++ ) {
-          acc += bfloat16_to_float(i_dof[l_n * (i_k + i_nz_size) + l_k]) * bfloat16_to_float(i_stiff[l_di * i_n + l_k * i_n * i_di + l_m]);
-          // std::cout << l_n * (i_k + i_nz_size) + l_k << " * " << l_di * i_n + l_k * i_n * i_di + l_m << " = " <<  bfloat16_to_float(i_dof[l_n * (i_k + i_nz_size) + l_k]) << " * " << bfloat16_to_float(i_stiff[l_di * i_n + l_k * i_n * i_di + l_m]) << std::endl; 
+          acc += upconvert_bf16_2(i_dof[l_n * (i_k + i_nz_size) + l_k]) * upconvert_bf16_2(i_stiff[l_di * i_n + l_k * i_n * i_di + l_m]);
+          // std::cout << l_n * (i_k + i_nz_size) + l_k << " * " << l_di * i_n + l_k * i_n * i_di + l_m << " = " <<  upconvert_bf16_2(i_dof[l_n * (i_k + i_nz_size) + l_k]) << " * " << upconvert_bf16_2(i_stiff[l_di * i_n + l_k * i_n * i_di + l_m]) << std::endl; 
         }
         o_result[l_di * i_m * i_n + l_n * i_n + l_m] += acc;
         // std::cout << " = " << l_di * i_m * i_n + l_n * i_n + l_m; 
@@ -173,13 +172,6 @@ void bf16_gemm_one(libxsmm_bfloat16* i_dof,
       }
     }
   }
-}
-
-float upconvert_bf16(libxsmm_bfloat16 x) {
-  libxsmm_bfloat16_f32 bf16_hp;
-  bf16_hp.i[1] = x;
-  bf16_hp.i[0] = 0;
-  return bf16_hp.f;
 }
 
 void bf16_gemm_upconvert(libxsmm_bfloat16* i_dof,
@@ -446,14 +438,14 @@ int main() {
                 35,
                 l_nz_idx.size());
 
-  // bf16_gemm_one((libxsmm_bfloat16 *)l_dof_2_padded.data(),
-  //             (libxsmm_bfloat16 *)l_stiff_padded.data(),
-  //             (float *)l_result,
-  //             3,
-  //             9,
-  //             20,
-  //             35,
-  //             l_nz_idx.size());
+  bf16_gemm_one((libxsmm_bfloat16 *)l_dof_2_padded.data(),
+              (libxsmm_bfloat16 *)l_stiff_padded.data(),
+              (float *)l_result,
+              3,
+              9,
+              20,
+              35,
+              l_nz_idx.size());
 
   auto end = std::chrono::high_resolution_clock::now();
 
@@ -523,10 +515,10 @@ int main() {
 
   float l_reference[9][3][35] = { 0 };
   // auto start = std::chrono::high_resolution_clock::now();
-
+      for( int64_t l_n = 0; l_n < 9; l_n++ ) {
   for( int64_t l_di = 0; l_di < 3; l_di++ ) {
     for( int64_t l_m = 0; l_m < 35; l_m++ ) {
-      for( int64_t l_n = 0; l_n < 9; l_n++ ) {
+
         for( int64_t l_k = 0; l_k < 35; l_k++ ) {
           l_reference[l_di][l_n][l_m] +=  l_dofs[l_n][l_k] * stiff_test[l_di][l_k][l_m];
           int64_t index_stiff_test = l_di * 35 * 35 + l_k * 35 + l_m;

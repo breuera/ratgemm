@@ -96,8 +96,8 @@ int main() {
 
   printf("Time spent: %lf seconds\n", time_spent);
 
-  // print_hex_matrix(input, rows, columns);
-  print_hex_and_compute_average(first_half_fp32, second_half_fp32, input, rows, columns);
+  print_hex_matrix(first_half_fp32, rows, columns);
+  // print_hex_and_compute_average(first_half_fp32, second_half_fp32, input, rows, columns);
 
   delete[] input;
   delete[] output;
