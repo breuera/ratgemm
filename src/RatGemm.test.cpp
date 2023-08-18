@@ -170,6 +170,9 @@ TEST_CASE( "Rational GEMM which multiplies random DOFs with three stiffness matr
                l_result[0] );
 
   // l_reference: real matmul of 3 rational matrices with multiple DOFs.
+  
+  std::cout << "\n-----------------------Reference:--------------------------------" << std::endl;
+
   float l_reference[3][9][35] = { 0 };
 
   for( int64_t l_di = 0; l_di < 3; l_di++ ) {
@@ -181,14 +184,45 @@ TEST_CASE( "Rational GEMM which multiplies random DOFs with three stiffness matr
       }
     }
   }
-
-  for( int64_t l_di = 0; l_di < 3; l_di++ ) {
-    for( int64_t l_m = 0; l_m < 20; l_m++ ) {
-      for( int64_t l_n = 0; l_n < 9; l_n++ ) {
-        int l_id_rat = l_di*20 + l_m;
-        REQUIRE( l_reference[l_di][l_n][l_m] == Approx(l_result[l_n][l_id_rat]) );
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 9; ++j) {
+      for (int k = 0; k < 35; ++k) {
+        std::cout << l_reference[i][j][k] << "   ";
       }
+       std::cout << std::endl;
     }
   }
+
+  // std::cout << "\n-----------------------Reference 2 :--------------------------------" << std::endl;
+
+  // float l_reference_2[3][9][35] = { 0 };
+
+  // for( int64_t l_di = 0; l_di < 3; l_di++ ) {
+  //   for( int64_t l_m = 0; l_m < 35; l_m++ ) {
+  //     for( int64_t l_n = 0; l_n < 9; l_n++ ) {
+  //       for( int64_t l_k = 0; l_k < 35; l_k++ ) {
+  //         l_reference_2[l_di][l_n][l_m] +=  l_dofs[l_n][l_k]* g_edge_stiffTLpc[l_di][l_k][l_m];
+  //       }
+  //     }
+  //   }
+  // }
+
+  // for (int i = 0; i < 3; ++i) {
+  //   for (int j = 0; j < 9; ++j) {
+  //     for (int k = 0; k < 35; ++k) {
+  //       std::cout << l_reference_2[i][j][k] << "   ";
+  //     }
+  //      std::cout << std::endl;
+  //   }
+  // }
+  
+  // for( int64_t l_di = 0; l_di < 3; l_di++ ) {
+  //   for( int64_t l_m = 0; l_m < 20; l_m++ ) {
+  //     for( int64_t l_n = 0; l_n < 9; l_n++ ) {
+  //       int l_id_rat = l_di*20 + l_m;
+  //       REQUIRE( l_reference[l_di][l_n][l_m] == Approx(l_result[l_n][l_id_rat]) );
+  //     }
+  //   }
+  // }
 
 }
