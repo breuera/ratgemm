@@ -8,6 +8,7 @@
 #include <random> // For random number generation
 #include <libxsmm.h>
 
+
 double stiff_test[3][35][35] = {
   {
     {  0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,  },
@@ -135,6 +136,20 @@ float upconvert_bf16_2(libxsmm_bfloat16 in) {
   return hybrid_in.f;
 }
 
+void extract_submatrix(const libxsmm_bfloat16* l_stiff_padded,
+                      int i_k, int i_n,
+                      libxsmm_bfloat16* o_submatrix,
+                      int i_start_col_idx) {
+    const libxsmm_bfloat16* l_pointer = l_stiff_padded + i_start_col_idx;
+    const int l_submatrix_width = i_n / 3;
+    
+    for (int row = 0; row < i_k; ++row) {
+        for (int col = 0; col < l_submatrix_width; ++col) {
+            o_submatrix[row * l_submatrix_width + col] = l_pointer[row * i_n + col];
+        }
+    }
+}
+
 /* from https://github.com/libxsmm/libxsmm/blob/c38c752f2d6dba92ffcbecc5f40d2bd652684d00/samples/equation/equation_matmul.c#L25 : gemm_bf16 */
 void bf16_gemm_one(libxsmm_bfloat16* i_dof,
                    libxsmm_bfloat16* i_stiff,
@@ -157,22 +172,54 @@ void bf16_gemm_one(libxsmm_bfloat16* i_dof,
   }
 }
 
-void extract_submatrix(const libxsmm_bfloat16* l_stiff_padded,
-                      int i_k, int i_n,
-                      libxsmm_bfloat16* o_submatrix,
-                      int i_start_col_idx) {
-    const libxsmm_bfloat16* l_pointer = l_stiff_padded + i_start_col_idx;
-    const int l_submatrix_width = i_n / 3;
-    
-    for (int row = 0; row < i_k; ++row) {
-        for (int col = 0; col < l_submatrix_width; ++col) {
-            o_submatrix[row * l_submatrix_width + col] = l_pointer[row * i_n + col];
-        }
+void bf16_gemm_3x(libxsmm_bfloat16* i_dof,
+                   libxsmm_bfloat16* i_stiff,
+                   float* o_result,
+                   libxsmm_blasint i_m,
+                   libxsmm_blasint i_n,
+                   libxsmm_blasint i_k){
+
+  libxsmm_bfloat16* l_submatrix = new libxsmm_bfloat16[i_k * i_n];
+  extract_submatrix(i_stiff, i_k, i_n*3, l_submatrix, 0 * i_n);
+
+  for( int64_t l_m = 0; l_m < i_m; l_m++ ) {
+    for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
+      float acc = 0.0f;
+      for( int64_t l_k = 0; l_k < i_k; l_k++ ) {
+        acc += upconvert_bf16_2(i_dof[(l_m * i_k )+ l_k]) * upconvert_bf16_2(l_submatrix[l_k * i_n + l_n]);
+      }
+      o_result[l_m * i_n + l_n + (0 * i_m * i_n)] += acc;
     }
+  }
+
+  extract_submatrix(i_stiff, i_k, i_n*3, l_submatrix,  1 * i_n);
+  for( int64_t l_m = 0; l_m < i_m; l_m++ ) {
+    for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
+      float acc = 0.0f;
+      for( int64_t l_k = 0; l_k < i_k; l_k++ ) {
+        acc += upconvert_bf16_2(i_dof[(l_m * i_k )+ l_k]) * upconvert_bf16_2(l_submatrix[l_k * i_n + l_n]);
+      }
+      o_result[l_m * i_n + l_n + (1 * i_m * i_n)] += acc;
+    }
+  }
+
+
+  extract_submatrix(i_stiff, i_k, i_n*3, l_submatrix,  2 * i_n);
+  for( int64_t l_m = 0; l_m < i_m; l_m++ ) {
+    for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
+      float acc = 0.0f;
+      for( int64_t l_k = 0; l_k < i_k; l_k++ ) {
+        acc += upconvert_bf16_2(i_dof[(l_m * i_k )+ l_k]) * upconvert_bf16_2(l_submatrix[l_k * i_n + l_n]);
+      }
+      o_result[l_m * i_n + l_n + (2 * i_m * i_n)] += acc;
+    }
+  }
+
+  delete[] l_submatrix;
 }
 
-void gemm_bf16_libxsmm(const libxsmm_bfloat16* i_dof,
-                       const libxsmm_bfloat16* i_stiff,
+void gemm_bf16_libxsmm(libxsmm_bfloat16* i_dof,
+                       libxsmm_bfloat16* i_stiff,
                        float* o_result,
                        libxsmm_blasint i_m,
                        libxsmm_blasint i_n,
@@ -182,14 +229,14 @@ void gemm_bf16_libxsmm(const libxsmm_bfloat16* i_dof,
                    l_flags |= LIBXSMM_GEMM_FLAG_USE_XGEMM_ABI;
                    l_flags |= LIBXSMM_GEMM_FLAG_BETA_0;
 
-  libxsmm_bitfield l_prefetch_flags = 0;
+  libxsmm_bitfield l_prefetch_flags = LIBXSMM_GEMM_PREFETCH_NONE;
 
   libxsmm_gemmfunction l_bf16gemm = nullptr;
 
   // Strides
-  const libxsmm_blasint lda = i_m;
+  const libxsmm_blasint lda = i_n;
   const libxsmm_blasint ldb = i_k;
-  const libxsmm_blasint ldc = i_m;
+  const libxsmm_blasint ldc = i_n;
 
   // Data types
   const libxsmm_datatype a_in_type = LIBXSMM_DATATYPE_BF16;
@@ -197,8 +244,8 @@ void gemm_bf16_libxsmm(const libxsmm_bfloat16* i_dof,
   const libxsmm_datatype out_type = LIBXSMM_DATATYPE_F32;
   const libxsmm_datatype comp_type = LIBXSMM_DATATYPE_F32;
 
-   libxsmm_gemm_shape l_shape = libxsmm_create_gemm_shape(i_m,
-                                                          i_n,
+   libxsmm_gemm_shape l_shape = libxsmm_create_gemm_shape(i_n,
+                                                          i_m,
                                                           i_k,
                                                           lda,
                                                           ldb,
@@ -209,38 +256,27 @@ void gemm_bf16_libxsmm(const libxsmm_bfloat16* i_dof,
                                                           comp_type);
 
   libxsmm_bfloat16* l_submatrix = new libxsmm_bfloat16[i_k * i_n];
-  extract_submatrix(i_stiff, i_k, i_n*3, l_submatrix, 0);
 
   l_bf16gemm = libxsmm_dispatch_gemm_v2(l_shape,
                                         l_flags,
                                         l_prefetch_flags);
 
   libxsmm_gemm_param l_param;
-  memset(&l_param,
-          0,
-          sizeof(libxsmm_gemm_param));
+  libxsmm_blasint i;
+  const libxsmm_blasint d = 3;
 
-  l_param.a.primary = const_cast<libxsmm_bfloat16*>(i_dof);
-  l_param.b.primary = l_submatrix;
-  l_param.c.primary = o_result;
+  for (i = 0; i < d; ++i){
+    extract_submatrix(i_stiff, i_k, i_n*d, l_submatrix, i_n*i);
+    memset(&l_param,
+            0,
+            sizeof(libxsmm_gemm_param));
 
-  l_bf16gemm(&l_param);
+    l_param.a.primary = l_submatrix;
+    l_param.b.primary = const_cast<libxsmm_bfloat16*>(i_dof);
+    l_param.c.primary = o_result + (i * i_m * i_n);
 
-  extract_submatrix(i_stiff, i_k, i_n*3, l_submatrix, 20);
-
-  l_param.a.primary = const_cast<libxsmm_bfloat16*>(i_dof);
-  l_param.b.primary = l_submatrix;
-  l_param.c.primary = (o_result + 180);
-
-  l_bf16gemm(&l_param);
-
-  extract_submatrix(i_stiff, i_k, i_n*3, l_submatrix, 40);
-
-  l_param.a.primary = const_cast<libxsmm_bfloat16*>(i_dof);
-  l_param.b.primary = l_submatrix;
-  l_param.c.primary = (o_result + 360);
-
-  l_bf16gemm(&l_param);
+    l_bf16gemm(&l_param);
+  }
   
   delete[] l_submatrix;
 }
@@ -248,14 +284,14 @@ void gemm_bf16_libxsmm(const libxsmm_bfloat16* i_dof,
 void printMatrix(const libxsmm_bfloat16* matrix,
                  int rows,
                  int cols) {
-
   for (int i = 0; i < rows; ++i) {
     for (int j = 0; j < cols; ++j) {
       // Indexing formula for a 2D matrix: element at row i, column j is matrix[i * cols + j]
-      std::cout << std::fixed << std::setprecision(2) << float(matrix[i * cols + j]) << " ";
+      std::cout << std::fixed << std::setw(10) << std::setprecision(7) << upconvert_bf16_2(matrix[i * cols + j]) << " ";
     }
     std::cout << std::endl;
   }
+  std::cout << std::endl;
 }
 
 void convert_fp32_two_bf16(const float* i_matrix,
@@ -358,6 +394,74 @@ void pad_cols(const std::vector<libxsmm_bfloat16>& io_vec_1,
     }
   }
 }
+
+void print_matrix(const char* label, const float* matrix, int rows, int cols) {
+    std::cout << label << ":" << std::endl;
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            std::cout << std::setw(10) << std::setprecision(7) << matrix[i * cols + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+void fill_matrix(float* matrix, int rows, int cols, float max_value) {
+    for (int i = 0; i < rows * cols; ++i) {
+        matrix[i] = max_value * static_cast<float>(rand()) / RAND_MAX;
+    }
+}
+
+void test_matrix_multiplication() {
+  // Define the matrix dimensions
+  const int i_m = 2;
+  const int i_n = 4;
+  const int i_k = 6;
+
+  // Create input matrices
+  float i_dof_f[i_m * i_k];
+  float i_stiff_f[i_k * i_n * 3];
+  libxsmm_bfloat16 i_dof[i_m * i_k];
+  libxsmm_bfloat16 i_stiff[i_k * i_n * 3];
+  libxsmm_bfloat16 i_dof_1[i_m * i_k];
+  libxsmm_bfloat16 i_stiff_1[i_k * i_n * 3];
+  float o_result_libxsmm[i_m * 3 * i_n] = {0};
+  float o_result_manual[i_m * 3 * i_n] = {0};
+
+  // Initialize i_dof and i_stiff with appropriate values
+  fill_matrix(i_dof_f, i_m, i_k, 1.5);
+  fill_matrix(i_stiff_f, i_k, i_n * 3, 1.5);
+  convert_fp32_two_bf16(i_dof_f, i_dof, i_dof_1, i_m * i_k);
+  convert_fp32_two_bf16(i_stiff_f, i_stiff, i_stiff_1, i_k * i_n * 3);
+
+  // Call the functions
+  gemm_bf16_libxsmm(i_dof, i_stiff_1, o_result_libxsmm, i_m, i_n, i_k);
+  bf16_gemm_3x(i_dof, i_stiff_1, o_result_manual, i_m, i_n, i_k);
+
+  // Compare results element-wise with a tolerance
+  const float tolerance = 1e-5;
+  bool mismatch = false;
+  for (int i = 0; i < i_m * i_n; ++i) {
+    if (std::abs(o_result_libxsmm[i] - o_result_manual[i]) > tolerance) {
+      std::cout << "Mismatch at index " << i << ": "
+                << "Libxsmm result = " << o_result_libxsmm[i]
+                << ", Manual result = " << o_result_manual[i] << std::endl;
+      mismatch = true;
+    }
+  }
+
+  if (!mismatch) {
+    std::cout << "Results match!" << std::endl;
+  }
+
+  printMatrix(i_dof, i_m, i_k);
+  printMatrix(i_stiff_1, i_k, i_n * 3);
+
+  // Print computed results
+  print_matrix("Libxsmm Result Matrix", o_result_libxsmm, i_m * 3, i_n);
+  print_matrix("Manual Result Matrix", o_result_manual, i_m * 3, i_n);
+}
+
 
 int main() {
 
@@ -478,6 +582,7 @@ int main() {
 
   // First test
   float l_result_1[9][3][20] = { 0 };
+  float l_result_1_2[9][3][20] = { 0 };
 
   // auto start = std::chrono::high_resolution_clock::now();
   const libxsmm_blasint m = 9;
@@ -486,7 +591,7 @@ int main() {
 
   // int start_col = 40; // Starting column offset
   // libxsmm_bfloat16* submatrix = new libxsmm_bfloat16[k * n];
-  // extract_Submatrix((const libxsmm_bfloat16*)l_stiff_padded.data(), k, n*3, submatrix, start_col);
+  // extract_submatrix((const libxsmm_bfloat16*)l_stiff_padded.data(), k, n*3, submatrix, start_col);
 
   // std::cout << "\n-----------------------Converted to bf16:--------------------------------\n";
   // for (int i = 0; i < 35 + l_nz_idx.size(); i++) {
@@ -495,8 +600,6 @@ int main() {
   //   }
   //   std::cout << std::endl;
   // }
-  
-  // // Don't forget to free the memory when you're done
   // delete[] submatrix;
 
   // std::cout << (const libxsmm_bfloat16*)l_stiff_padded.data() <<std::endl;
@@ -504,42 +607,93 @@ int main() {
   // std::cout << "Value at the pointer: " << value << std::endl;
 
   auto start_time1 = std::chrono::high_resolution_clock::now();
-  gemm_bf16_libxsmm((const libxsmm_bfloat16*)l_dof_1_padded.data(),
-                    (const libxsmm_bfloat16*)l_stiff_padded.data(),
+  gemm_bf16_libxsmm((libxsmm_bfloat16*)l_dof_1_padded.data(),
+                    (libxsmm_bfloat16*)l_stiff_padded.data(),
                     (float*)l_result_1,
                     m,
                     n,
                     k);
+  gemm_bf16_libxsmm((libxsmm_bfloat16*)l_dof_2_padded.data(),
+                   (libxsmm_bfloat16*)l_stiff_padded.data(),
+                   (float*)l_result_1_2,
+                   m,
+                   n,
+                   k);
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 9; ++j) {
+      for (int k = 0; k < 20; ++k) {
+        l_result_1[i][j][k] += l_result_1_2[i][j][k];
+      }
+    }
+  }
   auto end_time1 = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_time1 = end_time1 - start_time1;
 
-  std::cout << "\n-----------------------Result:--------------------------------\n";
+  std::cout << "\n-----------------------Result libxsmm:--------------------------------\n";
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 9; ++j) {
       for (int k = 0; k < 20; ++k) {
         // int index = i * 9 * 20 + j * 20 + k;
         // std::cout << index << ": " ;
+        l_result_1[i][j][k] += l_result_1_2[i][j][k];
         std::cout << l_result_1[i][j][k] << "   ";
       }
       std::cout << std::endl;
     }
   }
 
-  float l_result_2[9][3][20] = { 0 };
-
-  auto start_time2 = std::chrono::high_resolution_clock::now();
+  float l_result_3[9][3][20] = { 0 };
+  auto start_time3 = std::chrono::high_resolution_clock::now();
   bf16_gemm_one((libxsmm_bfloat16 *)l_dof_1_padded.data(),
                 (libxsmm_bfloat16 *)l_stiff_padded.data(),
-                (float *)l_result_2,
+                (float *)l_result_3,
                 3,
                 9,
                 20,
                 35,
                 l_nz_idx.size());
+  bf16_gemm_one((libxsmm_bfloat16 *)l_dof_2_padded.data(),
+                (libxsmm_bfloat16 *)l_stiff_padded.data(),
+                (float *)l_result_3,
+                3,
+                9,
+                20,
+                35,
+                l_nz_idx.size());
+  auto end_time3 = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_time3 = end_time3 - start_time3;
+
+  std::cout << "\n-----------------------Result - 2x loop all:--------------------------------\n";
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 9; ++j) {
+      for (int k = 0; k < 20; ++k) {
+        // int index = i * 9 * 20 + j * 20 + k;
+        // std::cout << index << ": " ;
+        std::cout << l_result_3[i][j][k] << "   ";
+      }
+      std::cout << std::endl;
+    }
+  }
+
+  float l_result_2[9][3][20] = { 0 };
+  auto start_time2 = std::chrono::high_resolution_clock::now();
+  bf16_gemm_3x((libxsmm_bfloat16 *)l_dof_1_padded.data(),
+                (libxsmm_bfloat16 *)l_stiff_padded.data(),
+                (float *)l_result_2,
+                m,
+                n,
+                k);
+  bf16_gemm_3x((libxsmm_bfloat16 *)l_dof_2_padded.data(),
+                (libxsmm_bfloat16 *)l_stiff_padded.data(),
+                (float *)l_result_2,
+                m,
+                n,
+                k);
   auto end_time2 = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_time2 = end_time2 - start_time2;
 
-  std::cout << "\n-----------------------Result:--------------------------------\n";
+
+  std::cout << "\n-----------------------Result - 3x submatrix -2x:--------------------------------\n";
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 9; ++j) {
       for (int k = 0; k < 20; ++k) {
@@ -557,7 +711,7 @@ int main() {
     for( int64_t l_di = 0; l_di < 3; l_di++ ) {
       for( int64_t l_m = 0; l_m < 35; l_m++ ) {
         for( int64_t l_k = 0; l_k < 35; l_k++ ) {
-          l_reference[l_di][l_n][l_m] +=  l_dofs[l_n][l_k] * stiff_test[l_di][l_k][l_m];
+          l_reference[l_di][l_n][l_m] += l_dofs[l_n][l_k] * stiff_test[l_di][l_k][l_m];
           int64_t index_stiff_test = l_di * 35 * 35 + l_k * 35 + l_m;
           int64_t index_l_dofs = l_n * 35 + l_k;
           // std::cout << index_l_dofs << "*" << index_stiff_test << " = " << l_dofs[l_n][l_k] << " * " << stiff_test[l_di][l_k][l_m] << std::endl;
@@ -570,45 +724,47 @@ int main() {
    auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> duration = end - start;
 
-  std::cout << "\n-----------------------Reference:--------------------------------" << std::endl;
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 9; ++j) {
-      for (int k = 0; k < 20; ++k) {
-        // int index = i * 9 * 20 + j * 20 + k;
-        // std::cout << index << ": " ;
-        std::cout << l_reference[i][j][k] << "   ";
-      }
-       std::cout << std::endl;
-    }
-  }
-
-  // 
-  // std::cout << "\n-----------------------Reference:--------------------------------" << std::endl;
-
+  // std::cout << "\n-----------------------Reference - Alex:--------------------------------" << std::endl;
   // for (int i = 0; i < 3; ++i) {
   //   for (int j = 0; j < 9; ++j) {
-  //     for (int k = 0; k < 35; ++k) {
+  //     for (int k = 0; k < 20; ++k) {
+  //       // int index = i * 9 * 20 + j * 20 + k;
+  //       // std::cout << index << ": " ;
   //       std::cout << l_reference[i][j][k] << "   ";
   //     }
   //      std::cout << std::endl;
   //   }
   // }
 
-  //  float l_diff[9][3][20] = { 0 };
-  //  std::cout << "\n-----------------------Difference:--------------------------------\n";
-  //  for (int i = 0; i < 3; ++i) {
-  //   for (int j = 0; j < 9; ++j) {
-  //     for (int k = 0; k < 20; ++k) {
-  //       // l_diff[i][j][k] = l_reference[i][j][k] - l_result[i][j][k];
-  //       std::cout << l_reference[i][j][k] - l_result[i][j][k] << "   ";
-  //     }
-  //      std::cout << std::endl;
-  //   }
-  // }
-    std::cout << "\nExecution time of libxsmm function: " << std::fixed << std::setprecision(6) << elapsed_time1.count() << " seconds" << std::endl;
-    std::cout << "Execution time of bf16 gemm loop function: " << std::fixed << std::setprecision(6) << elapsed_time2.count() << " seconds" << std::endl;
-    std::cout << "Execution time of reference loop function: " << std::fixed << std::setprecision(6) << duration.count() << " seconds" << std::endl;
+  std::cout << "\n-----------------------Reference:--------------------------------" << std::endl;
 
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 9; ++j) {
+      for (int k = 0; k < 35; ++k) {
+        std::cout << l_reference[i][j][k] << "   ";
+      }
+       std::cout << std::endl;
+    }
+  }
+
+   float l_diff[9][3][20] = { 0 };
+   std::cout << "\n-----------------------Difference:--------------------------------\n";
+   for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 9; ++j) {
+      for (int k = 0; k < 20; ++k) {
+        // l_diff[i][j][k] = l_reference[i][j][k] - l_result[i][j][k];
+        std::cout << l_result_2[i][j][k] - l_reference[i][j][k] << "   ";
+      }
+       std::cout << std::endl;
+    }
+  }
+
+  std::cout << "\nExecution time of libxsmm function: " << std::fixed << std::setprecision(6) << elapsed_time1.count() << " seconds" << std::endl;
+  std::cout << "Execution time of bf16 gemm loop function: " << std::fixed << std::setprecision(6) << elapsed_time3.count() << " seconds" << std::endl;
+  std::cout << "Execution time of bf16 gemm 3x loop function: " << std::fixed << std::setprecision(6) << elapsed_time2.count() << " seconds" << std::endl;
+  std::cout << "Execution time of reference loop function: " << std::fixed << std::setprecision(6) << duration.count() << " seconds" << std::endl;
+
+  // test_matrix_multiplication();
 
 
   delete[] l_dof_1;
